@@ -101,6 +101,7 @@ function SearchScreenStack() {
         component={InstructorProfileScreen}
         options={{ title: 'Instructor Profile' }} // Show a custom title for InstructorProfileScreen
       />
+      
     </Stack.Navigator>
   );
 }

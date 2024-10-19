@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore'; // Firestore methods
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 import { app } from '../firebase'; // Firebase config
@@ -105,6 +105,10 @@ const SearchScreen = () => {
           renderItem={({ item }) => (
             <TouchableOpacity onPress={() => handleInstructorPress(item)}>
               <View style={styles.instructorContainer}>
+                <Image 
+                  source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }} 
+                  style={styles.profileImage} 
+                />
                 <Text>{item.firstName} {item.lastName}</Text>
                 <Text>Phone: {item.phone}</Text>
                 <Text>Email: {item.email}</Text>
@@ -145,6 +149,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
+    flexDirection: 'row', // Align image and text in a row
+    alignItems: 'center', // Center align text and image
+  },
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15, // Space between image and text
   },
   noResults: {
     marginTop: 20,
