@@ -13,7 +13,9 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const [isEditing, setIsEditing] = useState(false);
     const [updatedPhone, setUpdatedPhone] = useState(phone);
     const [visibleComments, setVisibleComments] = useState(5);  // Init
+    const [price, setPrice] = useState(50);  // Add default or fetched price
     const [updatedEmail, setUpdatedEmail] = useState(email);
+    const [updatedPrice, setUpdatedPrice] = useState(price);  // Editable price state
     const [updatedWhatsapp, setUpdatedWhatsapp] = useState(whatsapp);
     const [updatedPostcode, setUpdatedPostcode] = useState(postcode);
     const [plan, setPlan] = useState(activePlan);
@@ -30,6 +32,8 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const [newReply, setNewReply] = useState(''); // State to track reply text
     const navigation = useNavigation();
     const [showCommentInput, setShowCommentInput] = useState(false);  // Track if the comment input is visible
+    
+    
 
   
     useEffect(() => {
@@ -196,6 +200,46 @@ const handleToggleCommentInput = () => {
     }
   };
 
+  const handleSaveProfile = async () => {
+    if (isEditing) {
+      try {
+        const userDocRef = doc(firestore, 'users', userId);
+        await setDoc(userDocRef, {
+          phone: updatedPhone,
+          email: updatedEmail,
+          whatsapp: updatedWhatsapp,
+          postcode: updatedPostcode,
+          price: updatedPrice,  // Save the updated price
+        }, { merge: true });
+
+        setPrice(updatedPrice);  // Update the displayed price
+        setIsEditing(false);  // Exit edit mode
+        Alert.alert('Success', 'Profile updated successfully!');
+      } catch (error) {
+        console.error('Error saving profile:', error);
+        Alert.alert('Error', 'Could not save profile.');
+      }
+    } else {
+      setIsEditing(true);  // Enter edit mode
+    }
+  };
+  const fetchUserData = async () => {
+    try {
+      const userDocRef = doc(firestore, 'users', userId);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData.price) {
+          setPrice(userData.price);
+          setUpdatedPrice(userData.price);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
   // Handle removing a student
   const handleRemoveStudent = async (studentId) => {
     try {
@@ -215,6 +259,11 @@ const handleToggleCommentInput = () => {
       // Show input for the clicked comment
       setReplyCommentId(commentId);
     }
+  };
+  const handlePriceChange = (value) => {
+    // Prevent showing NaN when the input is empty, default to 0
+    const parsedValue = value === '' ? 0 : parseFloat(value);
+    setUpdatedPrice(parsedValue);
   };
 
   // Handle adding a student (image only)
@@ -310,8 +359,9 @@ const handleToggleCommentInput = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Profile Picture Section */}
-      <View style={styles.topSection}>
+    {/* Profile Picture and Info */}
+    <View style={styles.topSection}>
+        {/* Profile Picture Section */}
         <TouchableOpacity onPress={pickImage}>
           <Image source={{ uri: profileImage }} style={styles.profileImage} />
           <Text style={styles.editImageText}>Edit Profile Picture</Text>
@@ -320,14 +370,6 @@ const handleToggleCommentInput = () => {
           <Text style={styles.profileName}>{`${firstName} ${lastName}`}</Text>
         </View>
       </View>
-
-      {/* Upload Progress */}
-      {isUploading && (
-        <View style={styles.uploadingContainer}>
-          <Text>Uploading... {Math.round(uploadProgress)}%</Text>
-          <ActivityIndicator size="large" color="#007bff" />
-        </View>
-      )}
 
       {/* Editable Profile Info */}
       <View style={styles.contactRow}>
@@ -373,25 +415,32 @@ const handleToggleCommentInput = () => {
           placeholder="Postcode"
         />
       </View>
-      <Text style={styles.contactInfo}>Active Plan: {plan || 'None'}</Text>
 
-      {/* Stars and Votes */}
-      <View style={styles.ratingContainer}>
-        <View style={styles.starsContainer}>
-          {renderStars()}
-        </View>
-        <Text style={styles.votesText}>{totalVotes} votes</Text>
+      {/* Price per Hour Section with £ symbol */}
+      <View style={styles.contactRow}>
+        <Icon name="cash-outline" size={20} color="#007bff" />
+        <TextInput
+          style={styles.input}
+          editable={isEditing}
+          value={isEditing ? String(updatedPrice) : `£${price}`}  // Show "£" when not editing
+          onChangeText={handlePriceChange}
+          placeholder="Price per Hour"
+          keyboardType="numeric"
+        />
       </View>
+
+      <Text style={styles.contactInfo}>Active Plan: {activePlan || 'None'}</Text>
 
       {/* Action Buttons */}
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.smallButton} onPress={() => setIsEditing(!isEditing)}>
+        <TouchableOpacity style={styles.smallButton} onPress={handleSaveProfile}>
           <Text style={styles.buttonText}>{isEditing ? 'Save' : 'Edit Profile'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallButton} onPress={handleLogout}>
           <Text style={styles.buttonText}>Logout</Text>
         </TouchableOpacity>
       </View>
+
 
       
 
