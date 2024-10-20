@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore'; // Firestore methods
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 import { app } from '../firebase'; // Firebase config
 import Icon from 'react-native-vector-icons/Ionicons';  // Import Ionicons for star and other icons
 import { Picker } from '@react-native-picker/picker';  // Correct import for Picker in Expo
+import { saveViewedProfile } from './storage_helpers'; // Import saveViewedProfile function
 
 const SearchScreen = () => {
   const [postcode, setPostcode] = useState('');
   const [location, setLocation] = useState(null); // Store user's location (lat/lng)
-  const [activeUsers, setActiveUsers] = useState([]); // Store active instructors
-  const [nearbyInstructors, setNearbyInstructors] = useState([]); // Store instructors within 10 miles
+  const [nearbyInstructors, setNearbyInstructors] = useState([]); // Store instructors displayed in UI
   const [selectedFilter, setSelectedFilter] = useState('rating'); // Default filter for sorting
   const [errorMessage, setErrorMessage] = useState(''); // Store error message for invalid postcode
 
@@ -36,8 +36,6 @@ const SearchScreen = () => {
     }
   };
 
-  
-
   // Haversine formula to calculate the distance between two lat/lng points in miles
   const calculateDistance = (lat1, lng1, lat2, lng2) => {
     const toRadians = (degrees) => degrees * (Math.PI / 180);
@@ -52,30 +50,7 @@ const SearchScreen = () => {
     return R * c; // Distance in miles
   };
 
-  // Fetch active users from Firestore
-  const fetchActiveUsers = async () => {
-    try {
-      const usersRef = collection(firestore, 'users');
-      const q = query(usersRef, where('activePlan', '!=', '')); // Fetch only active users
-      const snapshot = await getDocs(q);
-      const activeUsersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // For each instructor, fetch student and comment counts
-      const instructorsWithCounts = await Promise.all(
-        activeUsersData.map(async (instructor) => {
-          const studentsCount = await getSubCollectionCount(instructor.id, 'students');
-          const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
-          return { ...instructor, studentsCount, commentsCount };
-        })
-      );
-
-      setActiveUsers(instructorsWithCounts); // Store active users with counts
-    } catch (error) {
-      console.error('Error fetching active users:', error);
-    }
-  };
-
-  // Helper function to fetch sub-collection document count
+  // Function to fetch sub-collection document count
   const getSubCollectionCount = async (userId, subCollectionName) => {
     try {
       const subCollectionRef = collection(firestore, 'users', userId, subCollectionName);
@@ -87,33 +62,82 @@ const SearchScreen = () => {
     }
   };
 
+  // Helper function to fetch instructor rating and votes
+  const fetchInstructorRating = async (userId) => {
+    try {
+      const ratingsRef = collection(firestore, 'users', userId, 'ratings');
+      const snapshot = await getDocs(ratingsRef);
+      const totalVotes = snapshot.size;
+      const totalRating = snapshot.docs.reduce((sum, doc) => sum + (doc.data().rating || 0), 0);
+      const averageRating = totalVotes > 0 ? totalRating / totalVotes : 0;
+      return { rating: averageRating, totalVotes };
+    } catch (error) {
+      console.error(`Error fetching rating for user ${userId}:`, error);
+      return { rating: 0, totalVotes: 0 };
+    }
+  };
+
   // Function to handle the search and find nearby instructors
   const handleSearch = async () => {
     const userLocation = await geocodePostcode(postcode);
     if (userLocation) {
-      setLocation(userLocation); // Store user's lat/lng
-      await fetchActiveUsers(); // Fetch active instructors
+      setLocation(userLocation);
 
-      // Filter instructors within 10 miles of user's location
-      let nearby = activeUsers.filter(instructor => {
-        const distance = calculateDistance(
-          userLocation.lat,
-          userLocation.lng,
-          instructor.latitude,
-          instructor.longitude
+      // Fetch active instructors and filter immediately using the fetched data (not state)
+      try {
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('activePlan', '!=', '')); // Fetch only active users
+        const snapshot = await getDocs(q);
+        const activeUsersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // For each instructor, fetch student, comment counts, and rating info
+        const instructorsWithCounts = await Promise.all(
+          activeUsersData.map(async (instructor) => {
+            const studentsCount = await getSubCollectionCount(instructor.id, 'students');
+            const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
+            const ratingData = await fetchInstructorRating(instructor.id);
+            return { ...instructor, studentsCount, commentsCount, ...ratingData };
+          })
         );
-        return distance <= 10; // Only show instructors within 10 miles
-      });
 
-      // Apply selected filter (e.g., by rating or price)
-      if (selectedFilter === 'rating') {
-        nearby = nearby.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      } else if (selectedFilter === 'price') {
-        nearby = nearby.sort((a, b) => (a.price || 0) - (b.price || 0));
+        // Filter instructors within 10 miles of user's location
+        let nearby = instructorsWithCounts.filter(instructor => {
+          if (instructor.latitude && instructor.longitude) {
+            const distance = calculateDistance(
+              userLocation.lat,
+              userLocation.lng,
+              instructor.latitude,
+              instructor.longitude
+            );
+            return distance <= 10; // Only show instructors within 10 miles
+          }
+          return false;
+        });
+
+        // Store the filtered instructors in state
+        sortInstructors(nearby, selectedFilter); // Sort the filtered list based on the selected filter
+        setNearbyInstructors(nearby);
+      } catch (error) {
+        console.error('Error fetching active users:', error);
       }
-
-      setNearbyInstructors(nearby); // Store nearby instructors for displaying
     }
+  };
+
+  // Function to sort instructors based on the selected filter
+  const sortInstructors = (instructors, filter) => {
+    let sortedInstructors = [...instructors]; // Create a copy to avoid mutating the state
+    if (filter === 'rating') {
+      sortedInstructors = sortedInstructors.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else if (filter === 'price') {
+      sortedInstructors = sortedInstructors.sort((a, b) => (a.price || 0) - (b.price || 0));
+    }
+    setNearbyInstructors(sortedInstructors); // Update the sorted list
+  };
+
+  // Function to handle filter changes
+  const handleFilterChange = (filter) => {
+    setSelectedFilter(filter); // Update selected filter
+    sortInstructors(nearbyInstructors, filter); // Sort based on the new filter
   };
 
   // Function to render stars based on rating
@@ -133,20 +157,24 @@ const SearchScreen = () => {
   };
 
   // Function to navigate to the selected instructor's profile
-  // Handle navigation to the profile screen without fetching comments and students here
-const handleInstructorPress = (instructor) => {
-  navigation.navigate('InstructorProfile', {
-    firstName: instructor.firstName,
-    lastName: instructor.lastName,
-    phone: instructor.phone,
-    email: instructor.email,
-    whatsapp: instructor.whatsapp,
-    profileImage: instructor.profileImage,
-    price: instructor.price,
-    activePlan: instructor.activePlan,
-    userId: instructor.id, // Pass the user ID to retrieve comments/students in the profile screen
-  });
-};
+  const handleInstructorPress = async (instructor) => {
+    await saveViewedProfile(instructor);
+    navigation.navigate('InstructorProfile', {
+      firstName: instructor.firstName,
+      lastName: instructor.lastName,
+      phone: instructor.phone,
+      email: instructor.email,
+      whatsapp: instructor.whatsapp,
+      profileImage: instructor.profileImage,
+      price: instructor.price,
+      activePlan: instructor.activePlan,
+      userId: instructor.id,
+      studentsCount: instructor.studentsCount,
+      commentsCount: instructor.commentsCount,
+      rating: instructor.rating,
+      totalVotes: instructor.totalVotes
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -170,7 +198,7 @@ const handleInstructorPress = (instructor) => {
         <Picker
           selectedValue={selectedFilter}
           style={styles.picker}
-          onValueChange={(itemValue) => setSelectedFilter(itemValue)}
+          onValueChange={(itemValue) => handleFilterChange(itemValue)}
         >
           <Picker.Item label="Rating" value="rating" />
           <Picker.Item label="Price" value="price" />

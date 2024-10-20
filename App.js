@@ -10,6 +10,8 @@ import ProfileScreen from './components/profile';
 import InstructorProfileScreen from './components/instructorprofile';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import RecentlyViewedProfiles from './components/viewed';
+import { getAuth } from 'firebase/auth';
 
 // Messages and Viewed Profiles screen for tabs
 function MessagesScreen() {
@@ -20,13 +22,6 @@ function MessagesScreen() {
   );
 }
 
-function ViewedProfilesScreen() {
-  return (
-    <View style={styles.container}>
-      <Text>Viewed Profiles Screen</Text>
-    </View>
-  );
-}
 
 // Create Bottom Tabs and Stack Navigator
 const Tab = createBottomTabNavigator();
@@ -81,7 +76,7 @@ export default function App() {
         <Tab.Screen name="ProfileStack" component={ProfileStack} options={{ headerShown: false }} />
         <Tab.Screen name="Messages" component={MessagesScreen} />
         <Tab.Screen name="Search" component={SearchScreenStack} options={{ headerShown: false }} />
-        <Tab.Screen name="Viewed Profiles" component={ViewedProfilesScreen} />
+        <Tab.Screen name="Viewed Profiles" component={RecentlyViewedProfiles} />
       </Tab.Navigator>
     </NavigationContainer>
   );

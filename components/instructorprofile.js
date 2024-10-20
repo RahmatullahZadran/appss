@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { getFirestore, collection, getDocs, addDoc } from 'firebase/firestore';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { View, Text, Image, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { getFirestore, collection, getDocs, addDoc, doc,setDoc, getDoc} from 'firebase/firestore';
+import Icon from 'react-native-vector-icons/Ionicons'; // Import Icon
 import { Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import Stars from 'react-native-stars'; // Star rating library for Expo
+import { AntDesign } from '@expo/vector-icons'; // Icons for stars
 
 
 const InstructorProfileScreen = ({ route }) => {
@@ -18,15 +20,17 @@ const InstructorProfileScreen = ({ route }) => {
   const [showCommentInput, setShowCommentInput] = useState(false);  // Track if the comment input is visible
   const auth = getAuth();
   const currentUser = auth.currentUser;
-
+  const [averageRating, setAverageRating] = useState(0); // Store average rating
+  const [totalVotes, setTotalVotes] = useState(0); // Store total number of votes
+  const [userHasVoted, setUserHasVoted] = useState(false); // Track if the user has voted
+  const [rating, setRating] = useState(0); // User's selected rating
 
   const firestore = getFirestore(); // Initialize Firestore
 
   useEffect(() => {
-    // Fetch comments and students when the component loads
-    const fetchCommentsAndStudents = async () => {
+    const fetchCommentsAndStudentsAndRating = async () => {
       try {
-        // Fetch comments
+        // Fetch comments and students
         const commentsRef = collection(firestore, 'users', userId, 'comments');
         const commentsSnapshot = await getDocs(commentsRef);
         const commentsList = await Promise.all(
@@ -46,15 +50,73 @@ const InstructorProfileScreen = ({ route }) => {
 
         setComments(sortedComments);
         setStudents(studentsList);
+
+        // Fetch ratings and calculate the average rating
+        const ratingsRef = collection(firestore, 'users', userId, 'ratings');
+        const ratingsSnapshot = await getDocs(ratingsRef);
+        const allRatings = ratingsSnapshot.docs.map((doc) => doc.data().rating);
+        const totalRatings = allRatings.reduce((sum, rating) => sum + rating, 0);
+        const averageRating = allRatings.length > 0 ? totalRatings / allRatings.length : 0;
+
+        setAverageRating(averageRating);
+        setTotalVotes(allRatings.length);
+
+        // Check if current user has already voted
+        if (currentUser) {
+          const userRatingDoc = await getDoc(doc(firestore, 'users', userId, 'ratings', currentUser.uid));
+          if (userRatingDoc.exists()) {
+            setRating(userRatingDoc.data().rating);
+            setUserHasVoted(true);
+          }
+        }
       } catch (error) {
-        console.error('Error fetching comments or students:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCommentsAndStudents();
+    fetchCommentsAndStudentsAndRating();
   }, [userId]);
+
+  const handleRatingSubmit = async (newRating) => {
+    if (!currentUser) {
+      Alert.alert('Please log in', 'You need to log in to rate.');
+      return;
+    }
+
+    if (!userHasVoted) {
+      try {
+        const ratingRef = doc(firestore, 'users', userId, 'ratings', currentUser.uid);
+        await setDoc(ratingRef, { rating: newRating });
+
+        setRating(newRating);
+        setUserHasVoted(true);
+
+        // Fetch updated ratings and recalculate average
+        const ratingsRef = collection(firestore, 'users', userId, 'ratings');
+        const ratingsSnapshot = await getDocs(ratingsRef);
+        const allRatings = ratingsSnapshot.docs.map((doc) => doc.data().rating);
+        const totalRatings = allRatings.reduce((sum, rating) => sum + rating, 0);
+        const averageRating = allRatings.length > 0 ? totalRatings / allRatings.length : 0;
+
+        setAverageRating(averageRating);
+        setTotalVotes(allRatings.length);
+      } catch (error) {
+        console.error('Error submitting rating:', error);
+      }
+    } else {
+      Alert.alert('You have already voted', 'You can only vote once.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+      </View>
+    );
+  }
 
   const handleToggleCommentInput = () => {
     setShowCommentInput(!showCommentInput);  // Toggle the comment input visibility
@@ -62,6 +124,12 @@ const InstructorProfileScreen = ({ route }) => {
 
   // Handle adding a new comment
   const handleAddComment = async () => {
+    if (!currentUser) {
+      // Show an alert if the user is not logged in
+      Alert.alert('Please log in', 'You need to log in to comment.');
+      return; // Exit the function if the user is not logged in
+    }
+
     if (newComment.trim()) {
       try {
         // Reference to the current user's document in Firestore
@@ -94,12 +162,14 @@ const InstructorProfileScreen = ({ route }) => {
       }
     }
   };
-  
-  
-  
 
   // Handle adding a reply to a comment
   const handleAddReply = async (commentId) => {
+    if (!currentUser) {
+      Alert.alert('Please log in', 'You need to log in to reply.');
+      return;
+    }
+
     if (newReply.trim()) {
       const repliesRef = collection(firestore, 'users', userId, 'comments', commentId, 'replies');
       const newReplyData = {
@@ -117,7 +187,6 @@ const InstructorProfileScreen = ({ route }) => {
       setComments(updatedComments.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }
   };
-  
 
   // Toggle reply input visibility
   const handleReplyButtonClick = (commentId) => {
@@ -138,42 +207,72 @@ const InstructorProfileScreen = ({ route }) => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollViewContent}>
       {/* Instructor Profile Details */}
       <Image source={{ uri: profileImage || 'https://via.placeholder.com/150' }} style={styles.profileImage} />
       <Text style={styles.profileName}>{`${firstName} ${lastName}`}</Text>
-      <Text style={styles.infoText}>Phone: {phone}</Text>
-      <Text style={styles.infoText}>Email: {email}</Text>
-      <Text style={styles.infoText}>WhatsApp: {whatsapp}</Text>
+
+      <View style={styles.contactInfo}>
+        <Icon name="call-outline" size={24} color="green" />
+        <Text style={styles.infoText}>Phone: {phone}</Text>
+      </View>
+      
+      <View style={styles.contactInfo}>
+        <Icon name="mail-outline" size={24} color="orange" />
+        <Text style={styles.infoText}>Email: {email}</Text>
+      </View>
+
+      <View style={styles.contactInfo}>
+        <Icon name="logo-whatsapp" size={24} color="green" />
+        <Text style={styles.infoText}>WhatsApp: {whatsapp}</Text>
+      </View>
+
       <Text style={styles.infoText}>Price: £{price}</Text>
-      <Text style={styles.infoText}>Active Plan: {activePlan}</Text>
+      <View style={styles.ratingSection}>
+  <View style={styles.starsAndVotesContainer}>
+    <View style={styles.inlineContainer}>
+      <Stars
+        default={rating}
+        count={5}
+        half={true}
+        update={(newRating) => handleRatingSubmit(newRating)}
+        fullStar={<AntDesign name="star" size={24} color="gold" />}
+        emptyStar={<AntDesign name="staro" size={24} color="gold" />}
+        halfStar={<AntDesign name="starhalf" size={24} color="gold" />}
+        disabled={userHasVoted} // Disable stars after voting
+      />
+      <Text style={styles.infoText}>{averageRating.toFixed(1)} / 5</Text>
+      <Text style={styles.votesText}>({totalVotes} votes)</Text>
+    </View>
+  </View>
+</View>
+
 
       {/* Message Button */}
       <TouchableOpacity style={styles.messageButton}>
         <Text style={styles.buttonText}>Message</Text>
       </TouchableOpacity>
 
-       
       <View style={styles.section}>
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>Comments</Text>
-      <TouchableOpacity onPress={handleToggleCommentInput} style={styles.commentInputButton}>
-        <Icon name={showCommentInput ? "remove-circle-outline" : "add-circle-outline"} size={24} color="#007bff" />
-      </TouchableOpacity>
-    </View>
-    {showCommentInput && (
-      <View style={styles.commentInputContainer}>
-        <TextInput
-          style={styles.commentInput}
-          placeholder="Add a new comment"
-          value={newComment}
-          onChangeText={setNewComment}
-        />
-        <TouchableOpacity onPress={handleAddComment}>
-          <Icon name="send" size={24} color="#007bff" />
-        </TouchableOpacity>
-      </View>
-    )}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Comments</Text>
+          <TouchableOpacity onPress={handleToggleCommentInput} style={styles.commentInputButton}>
+            <Icon name={showCommentInput ? "remove-circle-outline" : "add-circle-outline"} size={24} color="#007bff" />
+          </TouchableOpacity>
+        </View>
+        {showCommentInput && (
+          <View style={styles.commentInputContainer}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Add a new comment"
+              value={newComment}
+              onChangeText={setNewComment}
+            />
+            <TouchableOpacity onPress={handleAddComment}>
+              <Icon name="send" size={24} color="#007bff" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Display Comments */}
         <FlatList
@@ -256,6 +355,9 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
   },
+  scrollViewContent: {
+    paddingBottom: 50, // Add padding to the bottom to ensure the last item is fully visible
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -279,9 +381,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  contactInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   infoText: {
     fontSize: 16,
-    marginBottom: 10,
+    marginLeft: 10,
   },
   messageButton: {
     backgroundColor: '#007bff',
@@ -380,6 +487,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
+  inlineContainer: {
+    flexDirection: 'row', // This ensures the children are aligned in a row
+    justifyContent: 'space-between', // Distributes space between stars, rating, and votes
+    alignItems: 'center', // Align items vertically
+    width: '100%', // Adjust this width based on your layout needs
+  },
+  
   studentContainer: {
     marginRight: 15,
   },

@@ -44,9 +44,9 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
 // Handle removing a comment
 
 
-const handleActiveButtonPress = () => {
-    if (activePlan) {
-      // If the user is active, ask if they want to cancel the plan
+const handleActiveButtonPress = async () => {
+    if (plan) {
+      // Ask if the user wants to cancel the plan
       Alert.alert(
         'Cancel Plan',
         'Are you sure you want to cancel your active plan?',
@@ -58,12 +58,17 @@ const handleActiveButtonPress = () => {
           {
             text: 'Yes',
             onPress: async () => {
-              // Handle plan cancellation
               try {
+                // Update Firestore
                 const userDocRef = doc(firestore, 'users', userId);
                 await setDoc(userDocRef, { activePlan: null }, { merge: true });
-                setPlan(null);  // Update the state to reflect the plan is cancelled
+                
+                // Optimistically update local state
+                setPlan(null);
                 Alert.alert('Cancelled', 'Your plan has been successfully cancelled.');
+  
+                // Re-fetch user data (if needed)
+                await fetchUserData();
               } catch (error) {
                 console.error('Error cancelling plan:', error);
                 Alert.alert('Error', 'Could not cancel the plan.');
@@ -73,7 +78,7 @@ const handleActiveButtonPress = () => {
         ]
       );
     } else {
-      // If the user is inactive, ask if they want to select a Weekly or Monthly plan
+      // Ask if the user wants to activate a plan
       Alert.alert(
         'Choose a Plan',
         'You are currently inactive. Would you like to activate a plan?',
@@ -81,12 +86,16 @@ const handleActiveButtonPress = () => {
           {
             text: 'Weekly',
             onPress: async () => {
-              // Handle Weekly plan activation
               try {
                 const userDocRef = doc(firestore, 'users', userId);
                 await setDoc(userDocRef, { activePlan: 'Weekly' }, { merge: true });
-                setPlan('Weekly');  // Update the state to reflect the plan is activated
+  
+                // Optimistically update local state
+                setPlan('Weekly');
                 Alert.alert('Success', 'Weekly plan activated.');
+  
+                // Re-fetch user data (if needed)
+                await fetchUserData();
               } catch (error) {
                 console.error('Error activating Weekly plan:', error);
                 Alert.alert('Error', 'Could not activate the Weekly plan.');
@@ -96,12 +105,16 @@ const handleActiveButtonPress = () => {
           {
             text: 'Monthly',
             onPress: async () => {
-              // Handle Monthly plan activation
               try {
                 const userDocRef = doc(firestore, 'users', userId);
                 await setDoc(userDocRef, { activePlan: 'Monthly' }, { merge: true });
-                setPlan('Monthly');  // Update the state to reflect the plan is activated
+  
+                // Optimistically update local state
+                setPlan('Monthly');
                 Alert.alert('Success', 'Monthly plan activated.');
+  
+                // Re-fetch user data (if needed)
+                await fetchUserData();
               } catch (error) {
                 console.error('Error activating Monthly plan:', error);
                 Alert.alert('Error', 'Could not activate the Monthly plan.');
@@ -116,6 +129,7 @@ const handleActiveButtonPress = () => {
       );
     }
   };
+  
 
 const fetchCoordinates = async (postcode) => {
     try {
