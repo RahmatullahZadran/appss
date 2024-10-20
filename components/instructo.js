@@ -514,10 +514,11 @@ const handleToggleCommentInput = () => {
         </View>
       ))}
 
+
       {/* "More" button to show more comments */}
       {visibleComments < comments.length && (
         <TouchableOpacity onPress={handleShowMoreComments}>
-          <Text style={styles.moreText}>More</Text>
+          <Text style={styles.moreText}>Show more comments</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -790,6 +791,11 @@ const styles = StyleSheet.create({
     },
     starsContainer: { 
       flexDirection: 'row' 
+    },
+    moreText: {
+        color: '#007bff',
+        textAlign: 'center',
+        marginTop: 10,
     },
     votesText: { 
       fontSize: 16, 
