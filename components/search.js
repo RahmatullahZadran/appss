@@ -36,6 +36,8 @@ const SearchScreen = () => {
     }
   };
 
+  
+
   // Haversine formula to calculate the distance between two lat/lng points in miles
   const calculateDistance = (lat1, lng1, lat2, lng2) => {
     const toRadians = (degrees) => degrees * (Math.PI / 180);

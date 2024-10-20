@@ -3,6 +3,8 @@ import { View, Text, Image, TextInput, TouchableOpacity, ScrollView, FlatList, S
 import { getFirestore, collection, getDocs, addDoc } from 'firebase/firestore';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Timestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+
 
 const InstructorProfileScreen = ({ route }) => {
   const { firstName, lastName, phone, email, whatsapp, profileImage, price, activePlan, userId } = route.params;
@@ -14,6 +16,9 @@ const InstructorProfileScreen = ({ route }) => {
   const [newReply, setNewReply] = useState(''); // Input for reply
   const [replyCommentId, setReplyCommentId] = useState(null); // Track the comment being replied to
   const [showCommentInput, setShowCommentInput] = useState(false);  // Track if the comment input is visible
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
+
 
   const firestore = getFirestore(); // Initialize Firestore
 
@@ -34,12 +39,12 @@ const InstructorProfileScreen = ({ route }) => {
           })
         );
 
-        // Fetch students
+        const sortedComments = commentsList.sort((a, b) => b.timestamp - a.timestamp);
         const studentsRef = collection(firestore, 'users', userId, 'students');
         const studentsSnapshot = await getDocs(studentsRef);
         const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        setComments(commentsList);
+        setComments(sortedComments);
         setStudents(studentsList);
       } catch (error) {
         console.error('Error fetching comments or students:', error);
@@ -58,18 +63,40 @@ const InstructorProfileScreen = ({ route }) => {
   // Handle adding a new comment
   const handleAddComment = async () => {
     if (newComment.trim()) {
-      const commentsRef = collection(firestore, 'users', userId, 'comments');
-      const newCommentData = {
-        text: newComment,
-        name: firstName, // This could be replaced with actual commenter's name if available
-        timestamp: Timestamp.now(), // Use Firestore timestamp
-      };
-
-      await addDoc(commentsRef, newCommentData); // Add comment to Firestore
-      setComments([newCommentData, ...comments]); // Update the local state
-      setNewComment(''); // Clear the input
+      try {
+        // Reference to the current user's document in Firestore
+        const userDocRef = collection(firestore, 'users');
+        const currentUserDoc = await getDocs(userDocRef);
+        const currentUserDocData = currentUserDoc.docs.find((doc) => doc.id === currentUser.uid);
+        
+        if (currentUserDocData) {
+          const firstName = currentUserDocData.data().firstName;
+  
+          // Reference to the comments collection
+          const commentsRef = collection(firestore, 'users', userId, 'comments');
+          const newCommentData = {
+            text: newComment,
+            name: firstName || currentUser.email, // Use the firstName from Firestore or fallback to email
+            timestamp: Timestamp.now(), // Use Firestore timestamp
+          };
+  
+          // Add the new comment to Firestore
+          await addDoc(commentsRef, newCommentData);
+  
+          // Update local state to show the new comment
+          const updatedComments = [newCommentData, ...comments].sort((a, b) => b.timestamp?.toDate() - a.timestamp?.toDate());
+  
+          setComments(updatedComments);
+          setNewComment(''); // Clear the comment input
+        }
+      } catch (error) {
+        console.error('Error fetching user data or adding comment:', error);
+      }
     }
   };
+  
+  
+  
 
   // Handle adding a reply to a comment
   const handleAddReply = async (commentId) => {
@@ -77,19 +104,20 @@ const InstructorProfileScreen = ({ route }) => {
       const repliesRef = collection(firestore, 'users', userId, 'comments', commentId, 'replies');
       const newReplyData = {
         text: newReply,
-        name: firstName, // This could be replaced with actual commenter's name if available
+        name: currentUser.firstName || currentUser.email, // Use current logged-in user's display name or email
         timestamp: Timestamp.now(), // Use Firestore timestamp
       };
-
+  
       await addDoc(repliesRef, newReplyData); // Add reply to Firestore
       setNewReply(''); // Clear the input
       setReplyCommentId(null); // Reset reply input visibility
-
+  
       // Fetch updated comments
       const updatedComments = await getDocs(collection(firestore, 'users', userId, 'comments'));
       setComments(updatedComments.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }
   };
+  
 
   // Toggle reply input visibility
   const handleReplyButtonClick = (commentId) => {
@@ -128,7 +156,7 @@ const InstructorProfileScreen = ({ route }) => {
        
       <View style={styles.section}>
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>My Comments</Text>
+      <Text style={styles.sectionTitle}>Comments</Text>
       <TouchableOpacity onPress={handleToggleCommentInput} style={styles.commentInputButton}>
         <Icon name={showCommentInput ? "remove-circle-outline" : "add-circle-outline"} size={24} color="#007bff" />
       </TouchableOpacity>
@@ -355,11 +383,11 @@ const styles = StyleSheet.create({
   studentContainer: {
     marginRight: 15,
   },
-  studentImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
+  studentImage: { 
+    width: 100,  // Set the width for the square image
+    height: 100,  // Set the height to be the same as the width for a square
+    borderRadius: 10,  // Optional: Add rounded corners for the image
+  }, 
 });
 
 export default InstructorProfileScreen;

@@ -44,6 +44,101 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
 // Handle removing a comment
 
 
+const handleActiveButtonPress = () => {
+    if (activePlan) {
+      // If the user is active, ask if they want to cancel the plan
+      Alert.alert(
+        'Cancel Plan',
+        'Are you sure you want to cancel your active plan?',
+        [
+          {
+            text: 'No',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes',
+            onPress: async () => {
+              // Handle plan cancellation
+              try {
+                const userDocRef = doc(firestore, 'users', userId);
+                await setDoc(userDocRef, { activePlan: null }, { merge: true });
+                setPlan(null);  // Update the state to reflect the plan is cancelled
+                Alert.alert('Cancelled', 'Your plan has been successfully cancelled.');
+              } catch (error) {
+                console.error('Error cancelling plan:', error);
+                Alert.alert('Error', 'Could not cancel the plan.');
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      // If the user is inactive, ask if they want to select a Weekly or Monthly plan
+      Alert.alert(
+        'Choose a Plan',
+        'You are currently inactive. Would you like to activate a plan?',
+        [
+          {
+            text: 'Weekly',
+            onPress: async () => {
+              // Handle Weekly plan activation
+              try {
+                const userDocRef = doc(firestore, 'users', userId);
+                await setDoc(userDocRef, { activePlan: 'Weekly' }, { merge: true });
+                setPlan('Weekly');  // Update the state to reflect the plan is activated
+                Alert.alert('Success', 'Weekly plan activated.');
+              } catch (error) {
+                console.error('Error activating Weekly plan:', error);
+                Alert.alert('Error', 'Could not activate the Weekly plan.');
+              }
+            },
+          },
+          {
+            text: 'Monthly',
+            onPress: async () => {
+              // Handle Monthly plan activation
+              try {
+                const userDocRef = doc(firestore, 'users', userId);
+                await setDoc(userDocRef, { activePlan: 'Monthly' }, { merge: true });
+                setPlan('Monthly');  // Update the state to reflect the plan is activated
+                Alert.alert('Success', 'Monthly plan activated.');
+              } catch (error) {
+                console.error('Error activating Monthly plan:', error);
+                Alert.alert('Error', 'Could not activate the Monthly plan.');
+              }
+            },
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+    }
+  };
+
+const fetchCoordinates = async (postcode) => {
+    try {
+      const response = await fetch(`https://api.postcodes.io/postcodes/${postcode}`);
+      const data = await response.json();
+  
+      if (data.status === 200) {
+        return {
+          latitude: data.result.latitude,
+          longitude: data.result.longitude,
+        };
+      } else {
+        Alert.alert('Error', 'Invalid postcode');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching coordinates:', error);
+      Alert.alert('Error', 'Could not fetch coordinates.');
+      return null;
+    }
+  };
+  
+
 const handleToggleCommentInput = () => {
     setShowCommentInput(!showCommentInput);  // Toggle the comment input visibility
   };
@@ -204,14 +299,27 @@ const handleToggleCommentInput = () => {
     if (isEditing) {
       try {
         const userDocRef = doc(firestore, 'users', userId);
+  
+        // Fetch coordinates based on the postcode
+        const coordinates = await fetchCoordinates(updatedPostcode);
+  
+        if (!coordinates) {
+          return; // Exit if the postcode is invalid or coordinates can't be fetched
+        }
+  
+        // Update Firestore with the profile data and the coordinates
         await setDoc(userDocRef, {
           phone: updatedPhone,
           email: updatedEmail,
           whatsapp: updatedWhatsapp,
           postcode: updatedPostcode,
           price: updatedPrice,  // Save the updated price
+          
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+           
         }, { merge: true });
-
+  
         setPrice(updatedPrice);  // Update the displayed price
         setIsEditing(false);  // Exit edit mode
         Alert.alert('Success', 'Profile updated successfully!');
@@ -223,6 +331,7 @@ const handleToggleCommentInput = () => {
       setIsEditing(true);  // Enter edit mode
     }
   };
+  
   const fetchUserData = async () => {
     try {
       const userDocRef = doc(firestore, 'users', userId);
@@ -361,15 +470,29 @@ const handleToggleCommentInput = () => {
     <ScrollView style={styles.container}>
     {/* Profile Picture and Info */}
     <View style={styles.topSection}>
-        {/* Profile Picture Section */}
-        <TouchableOpacity onPress={pickImage}>
-          <Image source={{ uri: profileImage }} style={styles.profileImage} />
-          <Text style={styles.editImageText}>Edit Profile Picture</Text>
-        </TouchableOpacity>
-        <View style={styles.infoContainer}>
-          <Text style={styles.profileName}>{`${firstName} ${lastName}`}</Text>
-        </View>
+      {/* Profile Picture Section */}
+      <TouchableOpacity onPress={pickImage}>
+        <Image source={{ uri: profileImage }} style={styles.profileImage} />
+        <Text style={styles.editImageText}>Edit Profile Picture</Text>
+      </TouchableOpacity>
+
+      <View style={styles.infoContainer}>
+        <Text style={styles.profileName}>{`${firstName} ${lastName}`}</Text>
+
+        {/* Active Status Button */}
+        <TouchableOpacity
+  style={[
+    styles.activeButton,
+    { backgroundColor: activePlan ? 'green' : 'red' },  // Change color based on activePlan
+  ]}
+  onPress={handleActiveButtonPress}  // Call the updated function here
+>
+  <Text style={styles.activeButtonText}>
+    {activePlan ? 'Active' : 'Inactive'}
+  </Text>
+</TouchableOpacity>
       </View>
+    </View>
 
       {/* Editable Profile Info */}
       <View style={styles.contactRow}>
@@ -740,6 +863,19 @@ const styles = StyleSheet.create({
       marginBottom: 20, 
       textAlign: 'center' 
     },
+    activeButton: {
+        padding: 10,
+        borderRadius: 20,
+        marginTop: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 100,
+      },
+      activeButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
+      },
     input: { 
       borderBottomWidth: 1, 
       borderBottomColor: '#ddd', 
