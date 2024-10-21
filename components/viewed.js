@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';  // For star and delete icons
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, Alert } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { getViewedProfiles } from './storage_helpers';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,27 +9,34 @@ const RecentlyViewedProfiles = () => {
   const [viewedProfiles, setViewedProfiles] = useState([]);
   const navigation = useNavigation();
 
-  // Fetch the last 15 viewed profiles from AsyncStorage
   const fetchViewedProfiles = async () => {
     const profiles = await getViewedProfiles();
     setViewedProfiles(profiles);
   };
 
-  // Use useFocusEffect to fetch the profiles every time the screen is focused
   useFocusEffect(
     useCallback(() => {
-      fetchViewedProfiles(); // Fetch viewed profiles when screen is focused
+      fetchViewedProfiles();
     }, [])
   );
 
-  // Function to delete a profile from the list and update AsyncStorage
-  const deleteProfile = async (id) => {
-    const updatedProfiles = viewedProfiles.filter(profile => profile.id !== id);
-    setViewedProfiles(updatedProfiles); // Update the state to remove the profile
-    await AsyncStorage.setItem('viewedProfiles', JSON.stringify(updatedProfiles)); // Update AsyncStorage
+  const deleteProfile = (id) => {
+    Alert.alert(
+      'Delete Profile',
+      'Are you sure you want to delete this profile from the list?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => handleDeleteProfile(id) },
+      ]
+    );
   };
 
-  // Function to render stars based on rating (if rating exists)
+  const handleDeleteProfile = async (id) => {
+    const updatedProfiles = viewedProfiles.filter(profile => profile.id !== id);
+    setViewedProfiles(updatedProfiles);
+    await AsyncStorage.setItem('viewedProfiles', JSON.stringify(updatedProfiles));
+  };
+
   const renderStars = (rating) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -37,15 +44,14 @@ const RecentlyViewedProfiles = () => {
         <Icon
           key={i}
           name={i <= rating ? 'star' : 'star-outline'}
-          size={16}
-          color={i <= rating ? '#FFD700' : '#ccc'}  // Yellow for filled stars, gray for empty
+          size={18}
+          color={i <= rating ? '#FFD700' : '#ccc'}
         />
       );
     }
     return stars;
   };
 
-  // Function to handle profile click and navigate to the profile screen
   const handleProfileClick = (profile) => {
     navigation.navigate('InstructorProfile', {
       firstName: profile.firstName,
@@ -72,8 +78,7 @@ const RecentlyViewedProfiles = () => {
             <View style={styles.profileContainer}>
               <TouchableOpacity onPress={() => handleProfileClick(item)} style={styles.profileDetails}>
                 <Text style={styles.profileName}>{item.firstName} {item.lastName}</Text>
-                
-                {/* Icons for Contact Info */}
+
                 <View style={styles.iconText}>
                   <Icon name="call-outline" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.phone}</Text>
@@ -86,13 +91,17 @@ const RecentlyViewedProfiles = () => {
                   <Icon name="logo-whatsapp" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.whatsapp}</Text>
                 </View>
-              
+
                 <Text style={styles.price}>£{item.price}</Text>
 
-                {/* Rating Section */}
+                <View style={styles.iconText}>
+                  <Icon name="car-outline" size={18} color="gray" />
+                  <Text style={styles.iconLabel}>{item.carType}</Text>
+                </View>
+
                 <View style={styles.ratingContainer}>
                   <View style={styles.stars}>
-                    {renderStars(item.rating || 0)}  
+                    {renderStars(item.rating || 0)}
                   </View>
                   <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
                 </View>
@@ -110,13 +119,11 @@ const RecentlyViewedProfiles = () => {
                 </View>
               </TouchableOpacity>
 
-              {/* Profile Image */}
-              <Image 
-                source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }} 
-                style={styles.profileImage} 
+              <Image
+                source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }}
+                style={styles.profileImage}
               />
 
-              {/* Delete Button (X icon) */}
               <TouchableOpacity onPress={() => deleteProfile(item.id)} style={styles.deleteButton}>
                 <Icon name="close-circle" size={24} color="red" />
               </TouchableOpacity>
@@ -134,32 +141,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    justifyContent: 'center',
+    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 20,
-    textAlign: 'center',
-  },
-  noProfilesText: {
-    fontSize: 16,
     textAlign: 'center',
   },
   profileContainer: {
     padding: 15,
-    backgroundColor: '#f8f8f8',
-    marginBottom: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    flexDirection: 'row', // Align image and details in a row
-    justifyContent: 'space-between', // Space between text and image
-    alignItems: 'center', // Align items vertically
-    position: 'relative', // To position delete button
+    backgroundColor: '#fff',
+    marginBottom: 15,
+    borderRadius: 12,
+    elevation: 3, // Shadow for Android
+    shadowColor: '#000', // Shadow for iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    position: 'relative',
   },
   profileDetails: {
-    flex: 1, // Take up available space for the details
-    marginRight: 15, // Space between details and profile image
+    flex: 1,
+    marginRight: 15,
   },
   profileImage: {
     width: 80,
@@ -170,12 +177,13 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
     marginBottom: 5,
+    color: '#333',
   },
   price: {
     fontSize: 18,
-    color: 'green', // Display price in green
+    color: '#28a745',
     fontWeight: 'bold',
     marginTop: 5,
   },
@@ -186,10 +194,10 @@ const styles = StyleSheet.create({
   },
   stars: {
     flexDirection: 'row',
-    marginRight: 10, // Space between stars and votes
+    marginRight: 10,
   },
   votesText: {
-    color: 'gray',
+    color: '#555',
   },
   iconContainer: {
     flexDirection: 'row',
@@ -198,21 +206,22 @@ const styles = StyleSheet.create({
   iconText: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 15, // Space between icons
+    marginRight: 15,
   },
   iconLabel: {
-    marginLeft: 5, // Space between icon and label
-    color: 'gray',
+    marginLeft: 5,
+    color: '#555',
   },
   deleteButton: {
     position: 'absolute',
-    top: 5,
-    right: 5,
+    top: 10,
+    right: 10,
   },
-  noResults: {
+  noProfilesText: {
     marginTop: 20,
+    fontSize: 16,
     textAlign: 'center',
-    color: 'gray',
+    color: '#999',
   },
 });
 

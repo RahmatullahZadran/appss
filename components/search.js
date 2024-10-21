@@ -1,45 +1,78 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore'; // Firestore methods
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation
-import { app } from '../firebase'; // Firebase config
-import Icon from 'react-native-vector-icons/Ionicons';  // Import Ionicons for star and other icons
-import { Picker } from '@react-native-picker/picker';  // Correct import for Picker in Expo
-import { saveViewedProfile } from './storage_helpers'; // Import saveViewedProfile function
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import * as Location from 'expo-location';  // Import Expo Location
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
+import { app } from '../firebase';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Picker } from '@react-native-picker/picker';
+import { saveViewedProfile } from './storage_helpers';
+import MapView, { Marker } from 'react-native-maps'; // Import MapView and Marker
 
 const SearchScreen = () => {
   const [postcode, setPostcode] = useState('');
-  const [location, setLocation] = useState(null); // Store user's location (lat/lng)
-  const [nearbyInstructors, setNearbyInstructors] = useState([]); // Store instructors displayed in UI
-  const [selectedFilter, setSelectedFilter] = useState('rating'); // Default filter for sorting
-  const [errorMessage, setErrorMessage] = useState(''); // Store error message for invalid postcode
+  const [location, setLocation] = useState(null);
+  const [nearbyInstructors, setNearbyInstructors] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState('rating');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isMapView, setIsMapView] = useState(false); // State to toggle map/list view
+  const [hasSearched, setHasSearched] = useState(false); // Track if user has searched
 
-  const navigation = useNavigation(); // Initialize navigation
-  const firestore = getFirestore(app); // Initialize Firestore
+  const navigation = useNavigation();
+  const firestore = getFirestore(app);
 
-  // Function to fetch lat/lng from postcode using Postcodes.io with fetch
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
+
+  // Request location permission and get the current location
+  const requestLocationPermission = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setErrorMessage('Permission to access location was denied');
+      return;
+    }
+  };
+
+  const useCurrentLocation = async () => {
+    try {
+      let userLocation = await Location.getCurrentPositionAsync({});
+      setPostcode(''); // Clear the postcode if using current location
+      setLocation({
+        lat: userLocation.coords.latitude,
+        lng: userLocation.coords.longitude,
+
+      } 
+    );
+    handleSearch();
+      setErrorMessage('');
+    } catch (error) {
+      setErrorMessage('Unable to retrieve current location');
+    }
+  };
+
   const geocodePostcode = async (postcode) => {
     try {
       const response = await fetch(`https://api.postcodes.io/postcodes/${postcode}`);
       const data = await response.json();
       if (data.status === 200) {
-        setErrorMessage(''); // Clear any previous error message
+        setErrorMessage('');
         const { latitude: lat, longitude: lng } = data.result;
         return { lat, lng };
       } else {
         throw new Error('Invalid postcode');
       }
     } catch (error) {
-      console.error('Error fetching geocode:', error);
-      setErrorMessage('Invalid postcode'); // Set the error message if postcode is invalid
+      setErrorMessage('Invalid postcode');
       return null;
     }
   };
 
-  // Haversine formula to calculate the distance between two lat/lng points in miles
   const calculateDistance = (lat1, lng1, lat2, lng2) => {
     const toRadians = (degrees) => degrees * (Math.PI / 180);
-    const R = 3958.8; // Radius of the Earth in miles
+    const R = 3958.8; // Earth radius in miles
     const dLat = toRadians(lat2 - lat1);
     const dLng = toRadians(lng2 - lng1);
     const a =
@@ -47,22 +80,19 @@ const SearchScreen = () => {
       Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
       Math.sin(dLng / 2) * Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in miles
+    return R * c;
   };
 
-  // Function to fetch sub-collection document count
   const getSubCollectionCount = async (userId, subCollectionName) => {
     try {
       const subCollectionRef = collection(firestore, 'users', userId, subCollectionName);
       const snapshot = await getDocs(subCollectionRef);
-      return snapshot.size;  // Return the number of documents in the sub-collection
+      return snapshot.size;
     } catch (error) {
-      console.error(`Error fetching ${subCollectionName} count for user ${userId}:`, error);
-      return 0;  // Return 0 if there's an error
+      return 0;
     }
   };
 
-  // Helper function to fetch instructor rating and votes
   const fetchInstructorRating = async (userId) => {
     try {
       const ratingsRef = collection(firestore, 'users', userId, 'ratings');
@@ -72,25 +102,22 @@ const SearchScreen = () => {
       const averageRating = totalVotes > 0 ? totalRating / totalVotes : 0;
       return { rating: averageRating, totalVotes };
     } catch (error) {
-      console.error(`Error fetching rating for user ${userId}:`, error);
       return { rating: 0, totalVotes: 0 };
     }
   };
 
-  // Function to handle the search and find nearby instructors
   const handleSearch = async () => {
-    const userLocation = await geocodePostcode(postcode);
+    setLoading(true);
+    const userLocation = postcode ? await geocodePostcode(postcode) : location; // Use the user's current location if postcode is not provided
+
     if (userLocation) {
       setLocation(userLocation);
-
-      // Fetch active instructors and filter immediately using the fetched data (not state)
       try {
         const usersRef = collection(firestore, 'users');
-        const q = query(usersRef, where('activePlan', '!=', '')); // Fetch only active users
+        const q = query(usersRef, where('activePlan', '!=', ''));
         const snapshot = await getDocs(q);
-        const activeUsersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        // For each instructor, fetch student, comment counts, and rating info
+        const activeUsersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
         const instructorsWithCounts = await Promise.all(
           activeUsersData.map(async (instructor) => {
             const studentsCount = await getSubCollectionCount(instructor.id, 'students');
@@ -100,8 +127,7 @@ const SearchScreen = () => {
           })
         );
 
-        // Filter instructors within 10 miles of user's location
-        let nearby = instructorsWithCounts.filter(instructor => {
+        let nearby = instructorsWithCounts.filter((instructor) => {
           if (instructor.latitude && instructor.longitude) {
             const distance = calculateDistance(
               userLocation.lat,
@@ -109,38 +135,36 @@ const SearchScreen = () => {
               instructor.latitude,
               instructor.longitude
             );
-            return distance <= 10; // Only show instructors within 10 miles
+            return distance <= 10;
           }
           return false;
         });
 
-        // Store the filtered instructors in state
-        sortInstructors(nearby, selectedFilter); // Sort the filtered list based on the selected filter
+        sortInstructors(nearby, selectedFilter);
         setNearbyInstructors(nearby);
+        setHasSearched(true); // Set to true after search is done
       } catch (error) {
-        console.error('Error fetching active users:', error);
+        setErrorMessage('Failed to fetch instructors.');
       }
     }
+    setLoading(false);
   };
 
-  // Function to sort instructors based on the selected filter
   const sortInstructors = (instructors, filter) => {
-    let sortedInstructors = [...instructors]; // Create a copy to avoid mutating the state
+    let sortedInstructors = [...instructors];
     if (filter === 'rating') {
-      sortedInstructors = sortedInstructors.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      sortedInstructors.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     } else if (filter === 'price') {
-      sortedInstructors = sortedInstructors.sort((a, b) => (a.price || 0) - (b.price || 0));
+      sortedInstructors.sort((a, b) => (a.price || 0) - (b.price || 0));
     }
-    setNearbyInstructors(sortedInstructors); // Update the sorted list
+    setNearbyInstructors(sortedInstructors);
   };
 
-  // Function to handle filter changes
   const handleFilterChange = (filter) => {
-    setSelectedFilter(filter); // Update selected filter
-    sortInstructors(nearbyInstructors, filter); // Sort based on the new filter
+    setSelectedFilter(filter);
+    sortInstructors(nearbyInstructors, filter);
   };
 
-  // Function to render stars based on rating
   const renderStars = (rating) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -149,14 +173,13 @@ const SearchScreen = () => {
           key={i}
           name={i <= rating ? 'star' : 'star-outline'}
           size={16}
-          color={i <= rating ? '#FFD700' : '#ccc'}  // Yellow for filled stars, gray for empty
+          color={i <= rating ? '#FFD700' : '#ccc'}
         />
       );
     }
     return stars;
   };
 
-  // Function to navigate to the selected instructor's profile
   const handleInstructorPress = async (instructor) => {
     await saveViewedProfile(instructor);
     navigation.navigate('InstructorProfile', {
@@ -172,95 +195,143 @@ const SearchScreen = () => {
       studentsCount: instructor.studentsCount,
       commentsCount: instructor.commentsCount,
       rating: instructor.rating,
-      totalVotes: instructor.totalVotes
+      totalVotes: instructor.totalVotes,
+      carType: instructor.carType // Add carType to the navigation
     });
   };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await handleSearch();
+    setRefreshing(false);
+  };
+
+  const renderMapView = () => (
+    <MapView
+      style={{ flex: 1, height: 300, marginBottom: 20 }}
+      initialRegion={{
+        latitude: location.lat,
+        longitude: location.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }}
+    >
+      {nearbyInstructors.map((instructor) => (
+        <Marker
+          key={instructor.id}
+          coordinate={{ latitude: instructor.latitude, longitude: instructor.longitude }}
+          title={`${instructor.firstName} ${instructor.lastName}`}
+          description={`Rating: ${instructor.rating || 0}`}
+        />
+      ))}
+    </MapView>
+  );
+
+  const renderListView = () => (
+    <FlatList
+      data={nearbyInstructors}
+      keyExtractor={(item) => item.id}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      renderItem={({ item }) => (
+        <TouchableOpacity onPress={() => handleInstructorPress(item)}>
+          <View style={styles.instructorContainer}>
+            <View style={styles.instructorDetails}>
+              <Text style={styles.instructorName}>
+                {item.firstName} {item.lastName}
+              </Text>
+
+              <View style={styles.iconText}>
+                <Icon name="call-outline" size={18} color="gray" />
+                <Text style={styles.iconLabel}>{item.phone}</Text>
+              </View>
+              <View style={styles.iconText}>
+                <Icon name="mail-outline" size={18} color="gray" />
+                <Text style={styles.iconLabel}>{item.email}</Text>
+              </View>
+              <View style={styles.iconText}>
+                <Icon name="logo-whatsapp" size={18} color="gray" />
+                <Text style={styles.iconLabel}>{item.whatsapp}</Text>
+              </View>
+
+              <Text style={styles.price}>£{item.price}</Text>
+
+              <View style={styles.iconText}>
+                <Icon name="car-outline" size={18} color="gray" />
+                <Text style={styles.iconLabel}>{item.carType}</Text>
+              </View>
+
+              <View style={styles.ratingContainer}>
+                <View style={styles.stars}>{renderStars(item.rating || 0)}</View>
+                <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
+              </View>
+
+              <View style={styles.iconContainer}>
+                <View style={styles.iconText}>
+                  <Icon name="people-outline" size={18} color="gray" />
+                  <Text style={styles.iconLabel}>{item.studentsCount || 0} students</Text>
+                </View>
+
+                <View style={styles.iconText}>
+                  <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
+                  <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
+                </View>
+              </View>
+            </View>
+
+            <Image
+              source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }}
+              style={styles.profileImage}
+            />
+          </View>
+        </TouchableOpacity>
+      )}
+    />
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Search for Active Instructors</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter postcode"
-        value={postcode}
-        onChangeText={(text) => setPostcode(text)}
-      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter postcode"
+          value={postcode}
+          onChangeText={setPostcode}
+        />
+        <TouchableOpacity onPress={useCurrentLocation}>
+          <Icon name="location-outline" size={24} color="gray" />
+        </TouchableOpacity>
+      </View>
 
-      {/* Display error message if postcode is invalid */}
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-      <Button title="Search" onPress={handleSearch} />
+      <View style={styles.buttonContainer}>
+        <Button title="Search" onPress={handleSearch} />
+        {hasSearched && (
+          <Button
+            title={isMapView ? "List View" : "Map View"}
+            onPress={() => setIsMapView(!isMapView)}
+          />
+        )}
+      </View>
 
-      {/* Filter Picker */}
       <View style={styles.filterContainer}>
         <Text>Sort by:</Text>
         <Picker
           selectedValue={selectedFilter}
           style={styles.picker}
-          onValueChange={(itemValue) => handleFilterChange(itemValue)}
+          onValueChange={handleFilterChange}
         >
           <Picker.Item label="Rating" value="rating" />
           <Picker.Item label="Price" value="price" />
         </Picker>
       </View>
 
-      {nearbyInstructors.length > 0 ? (
-        <FlatList
-          data={nearbyInstructors}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => handleInstructorPress(item)}>
-              <View style={styles.instructorContainer}>
-                <View style={styles.instructorDetails}>
-                  <Text style={styles.instructorName}>{item.firstName} {item.lastName}</Text>
-                  
-                  {/* Icons for Contact Info */}
-                  <View style={styles.iconText}>
-                    <Icon name="call-outline" size={18} color="gray" />
-                    <Text style={styles.iconLabel}>{item.phone}</Text>
-                  </View>
-                  <View style={styles.iconText}>
-                    <Icon name="mail-outline" size={18} color="gray" />
-                    <Text style={styles.iconLabel}>{item.email}</Text>
-                  </View>
-                  <View style={styles.iconText}>
-                    <Icon name="logo-whatsapp" size={18} color="gray" />
-                    <Text style={styles.iconLabel}>{item.whatsapp}</Text>
-                  </View>
-                
-                  <Text style={styles.price}>£{item.price}</Text>
-
-                  <View style={styles.ratingContainer}>
-                    <View style={styles.stars}>
-                      {renderStars(item.rating || 0)}  
-                    </View>
-                    <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
-                  </View>
-
-                  <View style={styles.iconContainer}>
-                    <View style={styles.iconText}>
-                      <Icon name="people-outline" size={18} color="gray" />
-                      <Text style={styles.iconLabel}>{item.studentsCount || 0} students</Text>
-                    </View>
-
-                    <View style={styles.iconText}>
-                      <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
-                      <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <Image 
-                  source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }} 
-                  style={styles.profileImage} 
-                />
-              </View>
-            </TouchableOpacity>
-          )}
-        />
+      {loading ? (
+        <ActivityIndicator size="large" color="#0000ff" />
       ) : (
-        <Text style={styles.noResults}>No instructors found within 10 miles.</Text>
+        isMapView ? renderMapView() : renderListView()
       )}
     </View>
   );
@@ -270,24 +341,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 20,
     marginBottom: 20,
     textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#333',
   },
-  input: {
-    height: 40,
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderColor: 'gray',
     borderWidth: 1,
-    marginBottom: 5,
+    borderRadius: 8,
+    marginBottom: 10,
     paddingHorizontal: 10,
+  },
+  input: {
+    flex: 1,
+    height: 40,
   },
   errorText: {
     color: 'red',
     marginBottom: 15,
     textAlign: 'center',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // Align buttons next to each other
+    marginBottom: 10,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -297,21 +381,27 @@ const styles = StyleSheet.create({
   picker: {
     flex: 1,
     height: 40,
+    borderRadius: 8,
   },
   instructorContainer: {
     padding: 15,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#fff',
     marginBottom: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#ddd',
-    flexDirection: 'row', // Align image and details in a row
-    justifyContent: 'space-between', // Space between text and image
-    alignItems: 'center', // Align items vertically
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
   instructorDetails: {
-    flex: 1, // Take up available space for the details
-    marginRight: 15, // Space between details and profile image
+    flex: 1,
+    marginRight: 15,
   },
   profileImage: {
     width: 80,
@@ -327,7 +417,7 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 18,
-    color: 'green', // Display price in green
+    color: 'green',
     fontWeight: 'bold',
     marginTop: 5,
   },
@@ -338,7 +428,7 @@ const styles = StyleSheet.create({
   },
   stars: {
     flexDirection: 'row',
-    marginRight: 10, // Space between stars and votes
+    marginRight: 10,
   },
   votesText: {
     color: 'gray',
@@ -350,15 +440,10 @@ const styles = StyleSheet.create({
   iconText: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 15, // Space between icons
+    marginRight: 15,
   },
   iconLabel: {
-    marginLeft: 5, // Space between icon and label
-    color: 'gray',
-  },
-  noResults: {
-    marginTop: 20,
-    textAlign: 'center',
+    marginLeft: 5,
     color: 'gray',
   },
 });

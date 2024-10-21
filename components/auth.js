@@ -8,7 +8,7 @@ import { setDoc, doc } from 'firebase/firestore';  // Firestore functions
 const AuthScreen = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('');  // Used for login and authentication
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');  // Confirm password field
   const [isLogin, setIsLogin] = useState(true);  // Toggle between login/register
@@ -92,7 +92,7 @@ const AuthScreen = () => {
       await setDoc(doc(firestore, 'users', user.uid), {
         firstName,
         lastName,
-        email: user.email,
+        MainEmail: user.email,  // Store login email as MainEmail in Firestore
         role,  // Save role as either student or instructor
       });
 

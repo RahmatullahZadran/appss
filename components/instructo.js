@@ -8,13 +8,15 @@ import Icon from 'react-native-vector-icons/Ionicons';  // Import icons from rea
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';  // Image Picker
 import { Timestamp } from 'firebase/firestore'; 
+import RNPickerSelect from 'react-native-picker-select';
 
 const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postcode, activePlan, userId }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [updatedPhone, setUpdatedPhone] = useState(phone);
     const [visibleComments, setVisibleComments] = useState(5);  // Init
-    const [price, setPrice] = useState(50);  // Add default or fetched price
-    const [updatedEmail, setUpdatedEmail] = useState(email);
+    const [price, setPrice] = useState(35);  // Add default or fetched price
+    const [updatedEmail, setUpdatedEmail] = useState('');  // Editable contact email state
+
     const [updatedPrice, setUpdatedPrice] = useState(price);  // Editable price state
     const [updatedWhatsapp, setUpdatedWhatsapp] = useState(whatsapp);
     const [updatedPostcode, setUpdatedPostcode] = useState(postcode);
@@ -26,12 +28,12 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [rating, setRating] = useState(0);  // User's selected rating
-    const [totalVotes, setTotalVotes] = useState(120); // Dummy vote count
     const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [replyCommentId, setReplyCommentId] = useState(null); // State to track the comment being replied to
     const [newReply, setNewReply] = useState(''); // State to track reply text
     const navigation = useNavigation();
     const [showCommentInput, setShowCommentInput] = useState(false);  // Track if the comment input is visible
+    const [carType, setCarType] = useState('Both'); // Default to "Both"
     
     
 
@@ -43,6 +45,30 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     }, []);
 // Handle removing a comment
 
+
+const pickerSelectStyles = {
+    inputIOS: {
+      fontSize: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 10,
+      borderWidth: 1,
+      borderColor: '#007bff',
+      borderRadius: 8,
+      color: '#007bff',
+      paddingRight: 30, // to ensure the text is never behind the icon
+    },
+    inputAndroid: {
+      fontSize: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: '#007bff',
+      borderRadius: 8,
+      color: '#007bff',
+      paddingRight: 30, // to ensure the text is never behind the icon
+    },
+  };
+  
 
 const handleActiveButtonPress = async () => {
     if (plan) {
@@ -313,14 +339,14 @@ const handleToggleCommentInput = () => {
     if (isEditing) {
       try {
         const userDocRef = doc(firestore, 'users', userId);
-  
+    
         // Fetch coordinates based on the postcode
         const coordinates = await fetchCoordinates(updatedPostcode);
-  
+    
         if (!coordinates) {
           return; // Exit if the postcode is invalid or coordinates can't be fetched
         }
-  
+    
         // Update Firestore with the profile data and the coordinates
         await setDoc(userDocRef, {
           phone: updatedPhone,
@@ -328,12 +354,11 @@ const handleToggleCommentInput = () => {
           whatsapp: updatedWhatsapp,
           postcode: updatedPostcode,
           price: updatedPrice,  // Save the updated price
-          
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
-           
+          carType: carType, // Save the selected car type in Firestore
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
         }, { merge: true });
-  
+    
         setPrice(updatedPrice);  // Update the displayed price
         setIsEditing(false);  // Exit edit mode
         Alert.alert('Success', 'Profile updated successfully!');
@@ -345,6 +370,7 @@ const handleToggleCommentInput = () => {
       setIsEditing(true);  // Enter edit mode
     }
   };
+  
   
   const fetchUserData = async () => {
     try {
@@ -521,16 +547,16 @@ const handleToggleCommentInput = () => {
         />
       </View>
       <View style={styles.contactRow}>
-        <Icon name="mail-outline" size={20} color="#007bff" />
-        <TextInput
-          style={styles.input}
-          editable={isEditing}
-          value={updatedEmail}
-          onChangeText={setUpdatedEmail}
-          placeholder="Email"
-          keyboardType="email-address"
-        />
-      </View>
+  <Icon name="mail-outline" size={20} color="#007bff" />
+  <TextInput
+    style={styles.input}
+    editable={isEditing}
+    value={updatedEmail}  // Allow users to input or update the contact email
+    onChangeText={setUpdatedEmail}
+    placeholder="Email"  // Show placeholder text if no email is provided
+    keyboardType="email-address"
+  />
+</View>
       <View style={styles.contactRow}>
         <Icon name="logo-whatsapp" size={20} color="#25D366" />
         <TextInput
@@ -565,6 +591,27 @@ const handleToggleCommentInput = () => {
           keyboardType="numeric"
         />
       </View>
+      <View style={styles.carTypeSection}>
+  <Icon name="car-outline" size={24} color="#007bff" style={styles.carIcon} />
+  <View style={styles.pickerContainer}>
+    {isEditing ? (
+      <RNPickerSelect
+        onValueChange={(value) => setCarType(value)}
+        items={[
+          { label: 'Manual', value: 'Manual' },
+          { label: 'Automatic', value: 'Automatic' },
+          { label: 'Both', value: 'Both' },
+        ]}
+        value={carType}
+        style={pickerSelectStyles}
+        placeholder={{ label: 'Select Car Type', value: null }}
+      />
+    ) : (
+      <Text style={styles.carTypeText}>{carType}</Text> // Display the selected car type when not editing
+    )}
+  </View>
+</View>
+
 
       <Text style={styles.contactInfo}>Active Plan: {activePlan || 'None'}</Text>
 
@@ -759,6 +806,20 @@ const styles = StyleSheet.create({
         backgroundColor: '#e0e0e0',
         borderRadius: 10,
       },
+      carTypeSection: {
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        marginBottom: 20,
+      },
+      carIcon: {
+        marginRight: 10,
+      },
+      pickerContainer: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 10,
+      },
       replyText: {
         fontSize: 14,
         color: '#333',
@@ -884,6 +945,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         width: 100,
+      },
+      carTypeText: {
+        fontSize: 16,
+        color: '#333',
+        paddingVertical: 12,
       },
       activeButtonText: {
         color: '#fff',
