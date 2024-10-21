@@ -123,7 +123,11 @@ const SearchScreen = () => {
             const studentsCount = await getSubCollectionCount(instructor.id, 'students');
             const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
             const ratingData = await fetchInstructorRating(instructor.id);
-            return { ...instructor, studentsCount, commentsCount, ...ratingData };
+           const distance = instructor.latitude && instructor.longitude 
+            ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude) 
+            : null;  // Calculate distance
+          return { ...instructor, studentsCount, commentsCount, ...ratingData, distance }; // Include distance
+        
           })
         );
 
@@ -196,7 +200,8 @@ const SearchScreen = () => {
       commentsCount: instructor.commentsCount,
       rating: instructor.rating,
       totalVotes: instructor.totalVotes,
-      carType: instructor.carType // Add carType to the navigation
+      carType: instructor.carType, // Add carType to the navigation
+      distance: instructor.distance
     });
   };
 
@@ -239,7 +244,7 @@ const SearchScreen = () => {
               <Text style={styles.instructorName}>
                 {item.firstName} {item.lastName}
               </Text>
-
+  
               <View style={styles.iconText}>
                 <Icon name="call-outline" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.phone}</Text>
@@ -252,32 +257,40 @@ const SearchScreen = () => {
                 <Icon name="logo-whatsapp" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.whatsapp}</Text>
               </View>
-
+  
               <Text style={styles.price}>£{item.price}</Text>
-
+  
               <View style={styles.iconText}>
                 <Icon name="car-outline" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.carType}</Text>
               </View>
-
+  
               <View style={styles.ratingContainer}>
                 <View style={styles.stars}>{renderStars(item.rating || 0)}</View>
                 <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
               </View>
-
+  
               <View style={styles.iconContainer}>
                 <View style={styles.iconText}>
                   <Icon name="people-outline" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.studentsCount || 0} students</Text>
                 </View>
-
+  
                 <View style={styles.iconText}>
                   <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
                 </View>
+  
+                {/* Add the distance */}
+                {item.distance !== null && (
+                  <View style={styles.iconText}>
+                    <Icon name="location-outline" size={18} color="gray" />
+                    <Text style={styles.iconLabel}>{item.distance.toFixed(1)} miles</Text>
+                  </View>
+                )}
               </View>
             </View>
-
+  
             <Image
               source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }}
               style={styles.profileImage}
@@ -287,6 +300,7 @@ const SearchScreen = () => {
       )}
     />
   );
+  
 
   return (
     <View style={styles.container}>

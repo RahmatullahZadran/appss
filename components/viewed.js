@@ -116,6 +116,12 @@ const RecentlyViewedProfiles = () => {
                     <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
                     <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
                   </View>
+                  {item.distance !== null && (
+                  <View style={styles.iconText}>
+                    <Icon name="location-outline" size={18} color="gray" />
+                    <Text style={styles.iconLabel}>{item.distance.toFixed(1)} miles</Text>
+                  </View>
+                )}
                 </View>
               </TouchableOpacity>
 

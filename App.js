@@ -11,7 +11,6 @@ import InstructorProfileScreen from './components/instructorprofile';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import RecentlyViewedProfiles from './components/viewed';
-import { getAuth } from 'firebase/auth';
 
 // Messages and Viewed Profiles screen for tabs
 function MessagesScreen() {
@@ -21,7 +20,6 @@ function MessagesScreen() {
     </View>
   );
 }
-
 
 // Create Bottom Tabs and Stack Navigator
 const Tab = createBottomTabNavigator();
@@ -41,10 +39,46 @@ function ProfileStack() {
   return (
     <Stack.Navigator>
       {user ? (
-        <Stack.Screen name="Profile" component={ProfileScreen}  />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
       ) : (
-        <Stack.Screen name="Auth" component={AuthScreen}  />
+        <Stack.Screen name="Auth" component={AuthScreen} />
       )}
+    </Stack.Navigator>
+  );
+}
+
+// Create a Stack for Search, including navigating to Instructor Profile
+function SearchScreenStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{ headerShown: false }} // Hide the header for the SearchScreen
+      />
+      <Stack.Screen
+        name="InstructorProfile"
+        component={InstructorProfileScreen}
+        options={{ title: 'Instructor Profile' }} // Show a custom title for InstructorProfileScreen
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Create a Stack for Viewed Profiles, including navigating to Instructor Profile
+function ViewedProfilesStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="Viewed Profiles"
+        component={RecentlyViewedProfiles}
+        options={{ headerShown: false }} // Hide the header for the Viewed Profiles screen
+      />
+      <Stack.Screen
+        name="InstructorProfile"
+        component={InstructorProfileScreen}
+        options={{ title: 'Instructor Profile' }} // Show a custom title for InstructorProfileScreen
+      />
     </Stack.Navigator>
   );
 }
@@ -73,31 +107,24 @@ export default function App() {
           tabBarInactiveTintColor: 'gray',
         })}
       >
-        <Tab.Screen name="ProfileStack" component={ProfileStack} options={{ headerShown: false }} />
+        <Tab.Screen
+          name="ProfileStack"
+          component={ProfileStack}
+          options={{ headerShown: false }}
+        />
         <Tab.Screen name="Messages" component={MessagesScreen} />
-        <Tab.Screen name="Search" component={SearchScreenStack} options={{ headerShown: false }} />
-        <Tab.Screen name="Viewed Profiles" component={RecentlyViewedProfiles} />
+        <Tab.Screen
+          name="Search"
+          component={SearchScreenStack}
+          options={{ headerShown: false }}
+        />
+        <Tab.Screen
+          name="Viewed Profiles"
+          component={ViewedProfilesStack}
+          options={{ headerShown: false }}
+        />
       </Tab.Navigator>
     </NavigationContainer>
-  );
-}
-
-// Create a Stack for Search, including navigating to Instructor Profile
-function SearchScreenStack() {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="Search"
-        component={SearchScreen}
-        // Hide the header for the SearchScreen
-      />
-      <Stack.Screen
-        name="InstructorProfile"
-        component={InstructorProfileScreen}
-        options={{ title: 'Instructor Profile' }} // Show a custom title for InstructorProfileScreen
-      />
-      
-    </Stack.Navigator>
   );
 }
 

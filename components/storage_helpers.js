@@ -26,7 +26,8 @@ export const saveViewedProfile = async (instructor) => {
         commentsCount: instructor.commentsCount,
         rating: instructor.rating,
          totalVotes: instructor.totalVotes,
-         carType: instructor.carType
+         carType: instructor.carType,
+         distance: instructor.distance
 
 
       });
