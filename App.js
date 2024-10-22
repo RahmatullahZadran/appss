@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -8,18 +7,11 @@ import SearchScreen from './components/search';
 import AuthScreen from './components/auth';
 import ProfileScreen from './components/profile';
 import InstructorProfileScreen from './components/instructorprofile';
+import MessagesScreen from './components/Message';
+import ChattingScreen from './components/Chat';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import RecentlyViewedProfiles from './components/viewed';
-
-// Messages and Viewed Profiles screen for tabs
-function MessagesScreen() {
-  return (
-    <View style={styles.container}>
-      <Text>Messages Screen</Text>
-    </View>
-  );
-}
 
 // Create Bottom Tabs and Stack Navigator
 const Tab = createBottomTabNavigator();
@@ -47,37 +39,65 @@ function ProfileStack() {
   );
 }
 
-// Create a Stack for Search, including navigating to Instructor Profile
+// Stack Navigator for Search, InstructorProfile, and Chatting
 function SearchScreenStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen
         name="Search"
         component={SearchScreen}
-        options={{ headerShown: false }} // Hide the header for the SearchScreen
+        options={{ headerShown: true, title: 'Search' }}
       />
       <Stack.Screen
         name="InstructorProfile"
         component={InstructorProfileScreen}
-        options={{ title: 'Instructor Profile' }} // Show a custom title for InstructorProfileScreen
+        options={{ title: 'Instructor Profile' }}
+      />
+      <Stack.Screen
+        name="ChattingScreen"
+        component={ChattingScreen}
+        options={{ title: 'Chat' }}
       />
     </Stack.Navigator>
   );
 }
 
-// Create a Stack for Viewed Profiles, including navigating to Instructor Profile
+// Stack Navigator for Messages and Chatting
+function MessagesStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="Messages"
+        component={MessagesScreen}
+        options={{ headerShown: true, title: 'Messages' }}
+      />
+      <Stack.Screen
+        name="ChattingScreen"
+        component={ChattingScreen}
+        options={{ title: 'Chat' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Stack Navigator for Viewed Profiles and InstructorProfile
 function ViewedProfilesStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen
         name="Viewed Profiles"
         component={RecentlyViewedProfiles}
-        options={{ headerShown: false }} // Hide the header for the Viewed Profiles screen
+        options={{ headerShown: true, title: 'Viewed Profiles' }}
       />
       <Stack.Screen
         name="InstructorProfile"
         component={InstructorProfileScreen}
-        options={{ title: 'Instructor Profile' }} // Show a custom title for InstructorProfileScreen
+        options={{ title: 'Instructor Profile' }}
+      />
+      <Stack.Screen
+        name="ChattingScreen"
+        component={ChattingScreen}
+        options={{ title: 'Chat' }}
       />
     </Stack.Navigator>
   );
@@ -93,11 +113,11 @@ export default function App() {
 
             if (route.name === 'ProfileStack') {
               iconName = focused ? 'person' : 'person-outline';
-            } else if (route.name === 'Messages') {
+            } else if (route.name === 'MessagesStack') {
               iconName = focused ? 'chatbox' : 'chatbox-outline';
-            } else if (route.name === 'Search') {
+            } else if (route.name === 'SearchScreenStack') {
               iconName = focused ? 'search' : 'search-outline';
-            } else if (route.name === 'Viewed Profiles') {
+            } else if (route.name === 'ViewedProfilesStack') {
               iconName = focused ? 'eye' : 'eye-outline';
             }
 
@@ -110,28 +130,24 @@ export default function App() {
         <Tab.Screen
           name="ProfileStack"
           component={ProfileStack}
-          options={{ headerShown: false }}
+          options={{ headerShown: false, title: 'Profile' }}
         />
-        <Tab.Screen name="Messages" component={MessagesScreen} />
         <Tab.Screen
-          name="Search"
+          name="MessagesStack"
+          component={MessagesStack}
+          options={{ headerShown: false, title: 'Messages' }}
+        />
+        <Tab.Screen
+          name="SearchScreenStack"
           component={SearchScreenStack}
-          options={{ headerShown: false }}
+          options={{ headerShown: false, title: 'Search' }}
         />
         <Tab.Screen
-          name="Viewed Profiles"
+          name="ViewedProfilesStack"
           component={ViewedProfilesStack}
-          options={{ headerShown: false }}
+          options={{ headerShown: false, title: 'Viewed Profiles' }}
         />
       </Tab.Navigator>
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

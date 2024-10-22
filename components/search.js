@@ -7,7 +7,6 @@ import { app } from '../firebase';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Picker } from '@react-native-picker/picker';
 import { saveViewedProfile } from './storage_helpers';
-import MapView, { Marker } from 'react-native-maps'; // Import MapView and Marker
 
 const SearchScreen = () => {
   const [postcode, setPostcode] = useState('');
@@ -17,7 +16,6 @@ const SearchScreen = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [isMapView, setIsMapView] = useState(false); // State to toggle map/list view
   const [hasSearched, setHasSearched] = useState(false); // Track if user has searched
 
   const navigation = useNavigation();
@@ -43,10 +41,8 @@ const SearchScreen = () => {
       setLocation({
         lat: userLocation.coords.latitude,
         lng: userLocation.coords.longitude,
-
-      } 
-    );
-    handleSearch();
+      });
+      handleSearch();
       setErrorMessage('');
     } catch (error) {
       setErrorMessage('Unable to retrieve current location');
@@ -123,11 +119,10 @@ const SearchScreen = () => {
             const studentsCount = await getSubCollectionCount(instructor.id, 'students');
             const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
             const ratingData = await fetchInstructorRating(instructor.id);
-           const distance = instructor.latitude && instructor.longitude 
-            ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude) 
-            : null;  // Calculate distance
-          return { ...instructor, studentsCount, commentsCount, ...ratingData, distance }; // Include distance
-        
+            const distance = instructor.latitude && instructor.longitude
+              ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude)
+              : null;  // Calculate distance
+            return { ...instructor, studentsCount, commentsCount, ...ratingData, distance }; // Include distance
           })
         );
 
@@ -201,7 +196,7 @@ const SearchScreen = () => {
       rating: instructor.rating,
       totalVotes: instructor.totalVotes,
       carType: instructor.carType, // Add carType to the navigation
-      distance: instructor.distance
+      distance: instructor.distance,
     });
   };
 
@@ -210,27 +205,6 @@ const SearchScreen = () => {
     await handleSearch();
     setRefreshing(false);
   };
-
-  const renderMapView = () => (
-    <MapView
-      style={{ flex: 1, height: 300, marginBottom: 20 }}
-      initialRegion={{
-        latitude: location.lat,
-        longitude: location.lng,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }}
-    >
-      {nearbyInstructors.map((instructor) => (
-        <Marker
-          key={instructor.id}
-          coordinate={{ latitude: instructor.latitude, longitude: instructor.longitude }}
-          title={`${instructor.firstName} ${instructor.lastName}`}
-          description={`Rating: ${instructor.rating || 0}`}
-        />
-      ))}
-    </MapView>
-  );
 
   const renderListView = () => (
     <FlatList
@@ -244,7 +218,7 @@ const SearchScreen = () => {
               <Text style={styles.instructorName}>
                 {item.firstName} {item.lastName}
               </Text>
-  
+
               <View style={styles.iconText}>
                 <Icon name="call-outline" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.phone}</Text>
@@ -257,30 +231,30 @@ const SearchScreen = () => {
                 <Icon name="logo-whatsapp" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.whatsapp}</Text>
               </View>
-  
+
               <Text style={styles.price}>£{item.price}</Text>
-  
+
               <View style={styles.iconText}>
                 <Icon name="car-outline" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.carType}</Text>
               </View>
-  
+
               <View style={styles.ratingContainer}>
                 <View style={styles.stars}>{renderStars(item.rating || 0)}</View>
                 <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
               </View>
-  
+
               <View style={styles.iconContainer}>
                 <View style={styles.iconText}>
                   <Icon name="people-outline" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.studentsCount || 0} students</Text>
                 </View>
-  
+
                 <View style={styles.iconText}>
                   <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
                 </View>
-  
+
                 {/* Add the distance */}
                 {item.distance !== null && (
                   <View style={styles.iconText}>
@@ -290,7 +264,7 @@ const SearchScreen = () => {
                 )}
               </View>
             </View>
-  
+
             <Image
               source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }}
               style={styles.profileImage}
@@ -300,7 +274,6 @@ const SearchScreen = () => {
       )}
     />
   );
-  
 
   return (
     <View style={styles.container}>
@@ -322,12 +295,6 @@ const SearchScreen = () => {
 
       <View style={styles.buttonContainer}>
         <Button title="Search" onPress={handleSearch} />
-        {hasSearched && (
-          <Button
-            title={isMapView ? "List View" : "Map View"}
-            onPress={() => setIsMapView(!isMapView)}
-          />
-        )}
       </View>
 
       <View style={styles.filterContainer}>
@@ -345,7 +312,7 @@ const SearchScreen = () => {
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : (
-        isMapView ? renderMapView() : renderListView()
+        renderListView()
       )}
     </View>
   );
@@ -383,8 +350,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between', // Align buttons next to each other
     marginBottom: 10,
   },
   filterContainer: {

@@ -5,7 +5,7 @@ import { signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, addDoc, getDocs, deleteDoc } from 'firebase/firestore';  // Firestore methods
 import { useNavigation } from '@react-navigation/native';  // For navigation
 import Icon from 'react-native-vector-icons/Ionicons';  // Import icons from react-native-vector-icons
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';  // Image Picker
 import { Timestamp } from 'firebase/firestore'; 
 import RNPickerSelect from 'react-native-picker-select';
@@ -17,6 +17,9 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const [price, setPrice] = useState(35);  // Add default or fetched price
     const [updatedEmail, setUpdatedEmail] = useState('');  // Editable contact email state
 
+    const [rating, setRating] = useState(0); // Store the user's rating
+    const [totalVotes, setTotalVotes] = useState(0); //
+
     const [updatedPrice, setUpdatedPrice] = useState(price);  // Editable price state
     const [updatedWhatsapp, setUpdatedWhatsapp] = useState(whatsapp);
     const [updatedPostcode, setUpdatedPostcode] = useState(postcode);
@@ -27,7 +30,6 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const [students, setStudents] = useState([]);
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
-    const [rating, setRating] = useState(0);  // User's selected rating
     const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [replyCommentId, setReplyCommentId] = useState(null); // State to track the comment being replied to
     const [newReply, setNewReply] = useState(''); // State to track reply text
@@ -42,6 +44,8 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
       fetchProfilePicture();
       fetchStudents();
       fetchComments(); // Fetch students and comments when the component loads
+      fetchUserData();
+      fetchUserRating();
     }, []);
 // Handle removing a comment
 
@@ -67,6 +71,21 @@ const pickerSelectStyles = {
       color: '#007bff',
       paddingRight: 30, // to ensure the text is never behind the icon
     },
+  };
+
+  const renderStars = () => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Icon
+          key={i}
+          name={i <= rating ? 'star' : 'star-outline'}
+          size={24}
+          color={i <= rating ? '#FFD700' : '#ccc'}  // Highlight stars based on the rating
+        />
+      );
+    }
+    return stars;
   };
   
 
@@ -153,6 +172,21 @@ const handleActiveButtonPress = async () => {
           },
         ]
       );
+    }
+  };
+
+  const fetchUserRating = async () => {
+    try {
+      const ratingsRef = collection(firestore, 'users', userId, 'ratings');
+      const snapshot = await getDocs(ratingsRef);
+      const totalVotes = snapshot.size;
+      const totalRating = snapshot.docs.reduce((sum, doc) => sum + (doc.data().rating || 0), 0);
+      const averageRating = totalVotes > 0 ? totalRating / totalVotes : 0;
+      
+      setRating(averageRating);
+      setTotalVotes(totalVotes);
+    } catch (error) {
+      console.error('Error fetching rating:', error);
     }
   };
   
@@ -263,13 +297,13 @@ const handleToggleCommentInput = () => {
   const pickImage = async () => {
     const hasPermission = await requestPermission();
     if (!hasPermission) return;
-
+  
     let pickerResult = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 1,
+      quality: 0.5,  // Lowering quality to 50%
     });
-
+  
     if (!pickerResult.cancelled && pickerResult.assets && pickerResult.assets.length > 0) {
       console.log('Selected image URI:', pickerResult.assets[0].uri);
       await uploadImageToStorage(pickerResult.assets[0].uri);
@@ -277,6 +311,7 @@ const handleToggleCommentInput = () => {
       console.log('Image selection cancelled');
     }
   };
+  
 
   const uploadImageToStorage = async (imageUri) => {
     setIsUploading(true);
@@ -376,30 +411,58 @@ const handleToggleCommentInput = () => {
     try {
       const userDocRef = doc(firestore, 'users', userId);
       const userDoc = await getDoc(userDocRef);
-
+  
       if (userDoc.exists()) {
         const userData = userDoc.data();
+  
         if (userData.price) {
           setPrice(userData.price);
           setUpdatedPrice(userData.price);
+        }
+  
+        if (userData.rating) {
+          setRating(userData.rating);  // Make sure rating is being set here
         }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
   };
+  
 
   // Handle removing a student
-  const handleRemoveStudent = async (studentId) => {
-    try {
-      const studentDocRef = doc(firestore, 'users', userId, 'students', studentId);
+ const handleRemoveStudent = async (studentId) => {
+  try {
+    // Reference to the student's Firestore document
+    const studentDocRef = doc(firestore, 'users', userId, 'students', studentId);
+    
+    // Get the student's document data to retrieve the image URL
+    const studentDoc = await getDoc(studentDocRef);
+
+    if (studentDoc.exists()) {
+      const studentData = studentDoc.data();
+      const studentImageURL = studentData.image;
+
+      // Delete the image from Firebase Storage
+      if (studentImageURL) {
+        const imageRef = ref(storage, studentImageURL);  // Reference to the storage file
+        await deleteObject(imageRef);  // Delete the file from storage
+        console.log('Student image deleted successfully.');
+      }
+
+      // Delete the student document from Firestore
       await deleteDoc(studentDocRef);
-      setStudents(students.filter(student => student.id !== studentId));  // Update local state to remove the student
-    } catch (error) {
-      console.error('Error removing student:', error);
-      Alert.alert('Error', 'Could not remove the student');
+      console.log('Student document deleted successfully.');
+
+      // Update local state to remove the student
+      setStudents(students.filter(student => student.id !== studentId));
     }
-  };
+  } catch (error) {
+    console.error('Error removing student:', error);
+    Alert.alert('Error', 'Could not remove the student');
+  }
+};
+
   const handleReplyButtonClick = (commentId) => {
     if (replyCommentId === commentId) {
       // Hide input if the same reply button is clicked again
@@ -419,13 +482,13 @@ const handleToggleCommentInput = () => {
   const handlePickStudentImage = async () => {
     const hasPermission = await requestPermission();
     if (!hasPermission) return;
-
+  
     let pickerResult = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 1,
+      quality: 0.5,  // Lowering quality to 50%
     });
-
+  
     if (!pickerResult.cancelled && pickerResult.assets && pickerResult.assets.length > 0) {
       console.log('Selected student image URI:', pickerResult.assets[0].uri);
       await uploadStudentImage(pickerResult.assets[0].uri);
@@ -433,6 +496,7 @@ const handleToggleCommentInput = () => {
       console.log('Student image selection cancelled');
     }
   };
+  
   const handleAddReply = async (commentId) => {
     if (newReply.trim()) {
       const repliesRef = collection(firestore, 'users', userId, 'comments', commentId, 'replies');
@@ -490,49 +554,38 @@ const handleToggleCommentInput = () => {
   };
 
   // Render stars for rating
-  const renderStars = () => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <TouchableOpacity key={i} onPress={() => setRating(i)}>
-          <Icon
-            name={i <= rating ? 'star' : 'star-outline'}
-            size={24}
-            color={i <= rating ? '#FFD700' : '#ccc'}  // Highlight stars if selected
-          />
-        </TouchableOpacity>
-      );
-    }
-    return stars;
-  };
 
   return (
     <ScrollView style={styles.container}>
-    {/* Profile Picture and Info */}
-    <View style={styles.topSection}>
-      {/* Profile Picture Section */}
-      <TouchableOpacity onPress={pickImage}>
-        <Image source={{ uri: profileImage }} style={styles.profileImage} />
-        <Text style={styles.editImageText}>Edit Profile Picture</Text>
-      </TouchableOpacity>
+   <View style={styles.topSection}>
+        <TouchableOpacity onPress={pickImage}>
+          <Image source={{ uri: profileImage }} style={styles.profileImage} />
+          <Text style={styles.editImageText}>Edit Profile Picture</Text>
+        </TouchableOpacity>
 
-      <View style={styles.infoContainer}>
-        <Text style={styles.profileName}>{`${firstName} ${lastName}`}</Text>
+        <View style={styles.infoContainer}>
+          <Text style={styles.profileName}>{`${firstName} ${lastName}`}</Text>
 
-        {/* Active Status Button */}
-        <TouchableOpacity
-  style={[
-    styles.activeButton,
-    { backgroundColor: activePlan ? 'green' : 'red' },  // Change color based on activePlan
-  ]}
-  onPress={handleActiveButtonPress}  // Call the updated function here
->
-  <Text style={styles.activeButtonText}>
-    {activePlan ? 'Active' : 'Inactive'}
-  </Text>
-</TouchableOpacity>
+          {/* Star Rating Section */}
+          <View style={styles.ratingContainer}>
+            {renderStars(rating)}  
+            <Text style={styles.votesText}>({totalVotes} votes)</Text>  
+          </View>
+
+          {/* Active Status Button */}
+          <TouchableOpacity
+            style={[
+              styles.activeButton,
+              { backgroundColor: activePlan ? 'green' : 'red' },
+            ]}
+            onPress={handleActiveButtonPress}
+          >
+            <Text style={styles.activeButtonText}>
+              {activePlan ? 'Active' : 'Inactive'}
+            </Text>
+          </TouchableOpacity>
+        </View> 
       </View>
-    </View>
 
       {/* Editable Profile Info */}
       <View style={styles.contactRow}>
@@ -932,6 +985,11 @@ const styles = StyleSheet.create({
       justifyContent: 'center', 
       padding: 20 
     },
+    ratingContainer: {
+        flexDirection: 'row', 
+        marginTop: -7, 
+        alignItems: 'center'
+      },
     modalTitle: { 
       fontSize: 24, 
       fontWeight: 'bold', 

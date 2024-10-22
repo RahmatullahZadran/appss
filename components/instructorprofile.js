@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TextInput, TouchableOpacity, ScrollView, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { getFirestore, collection, getDocs, addDoc, doc,setDoc, getDoc} from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, doc, setDoc, getDoc, query, where } from 'firebase/firestore';
 import Icon from 'react-native-vector-icons/Ionicons'; // Import Icon
 import { Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import Stars from 'react-native-stars'; // Star rating library for Expo
 import { AntDesign } from '@expo/vector-icons'; // Icons for stars
+import { useNavigation } from '@react-navigation/native';
+import Chat from './Chat';
+
 
 
 const InstructorProfileScreen = ({ route }) => {
@@ -24,6 +27,8 @@ const InstructorProfileScreen = ({ route }) => {
   const [totalVotes, setTotalVotes] = useState(0); // Store total number of votes
   const [userHasVoted, setUserHasVoted] = useState(false); // Track if the user has voted
   const [rating, setRating] = useState(0); // User's selected rating
+  const navigation = useNavigation();
+
 
   const firestore = getFirestore(); // Initialize Firestore
 
@@ -50,6 +55,7 @@ const InstructorProfileScreen = ({ route }) => {
 
         setComments(sortedComments);
         setStudents(studentsList);
+        
 
         // Fetch ratings and calculate the average rating
         const ratingsRef = collection(firestore, 'users', userId, 'ratings');
@@ -121,7 +127,49 @@ const InstructorProfileScreen = ({ route }) => {
   const handleToggleCommentInput = () => {
     setShowCommentInput(!showCommentInput);  // Toggle the comment input visibility
   };
-
+  const handleMessagePress = async () => {
+    if (!currentUser) {
+      Alert.alert('Please log in', 'You need to log in to start a conversation.');
+      return;
+    }
+  
+    try {
+      const chatsRef = collection(firestore, 'chats');
+      const q = query(chatsRef, where('participants', 'array-contains', currentUser.uid));
+      const chatSnapshot = await getDocs(q);
+  
+      let existingChat = null;
+  
+      chatSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.participants.includes(userId)) {
+          existingChat = { id: doc.id, ...data };
+        }
+      });
+  
+      let chatId;
+      if (existingChat) {
+        chatId = existingChat.id; // Use the existing chat ID
+      } else {
+        // Create a new chat
+        const newChatRef = await addDoc(collection(firestore, 'chats'), {
+          participants: [currentUser.uid, userId],
+          createdAt: Timestamp.now(),
+        });
+        chatId = newChatRef.id;
+      }
+  
+      // Navigate to the ChattingScreen
+      navigation.navigate('ChattingScreen', {
+        chatId,
+        instructorName: `${firstName} ${lastName}`,
+      });
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      Alert.alert('Error', 'Something went wrong while trying to start a conversation.');
+    }
+  };
+  
   // Handle adding a new comment
   const handleAddComment = async () => {
     if (!currentUser) {
@@ -164,30 +212,57 @@ const InstructorProfileScreen = ({ route }) => {
   };
 
   // Handle adding a reply to a comment
-  const handleAddReply = async (commentId) => {
+// Handle adding a reply to a comment
+const handleAddReply = async (commentId) => {
     if (!currentUser) {
       Alert.alert('Please log in', 'You need to log in to reply.');
       return;
     }
-
+  
     if (newReply.trim()) {
-      const repliesRef = collection(firestore, 'users', userId, 'comments', commentId, 'replies');
-      const newReplyData = {
-        text: newReply,
-        name: currentUser.firstName || currentUser.email, // Use current logged-in user's display name or email
-        timestamp: Timestamp.now(), // Use Firestore timestamp
-      };
+      try {
+        // Reference to the current user's document in Firestore
+        const userDocRef = collection(firestore, 'users');
+        const currentUserDoc = await getDocs(userDocRef);
+        const currentUserDocData = currentUserDoc.docs.find((doc) => doc.id === currentUser.uid);
   
-      await addDoc(repliesRef, newReplyData); // Add reply to Firestore
-      setNewReply(''); // Clear the input
-      setReplyCommentId(null); // Reset reply input visibility
+        if (currentUserDocData) {
+          const firstName = currentUserDocData.data().firstName;
   
-      // Fetch updated comments
-      const updatedComments = await getDocs(collection(firestore, 'users', userId, 'comments'));
-      setComments(updatedComments.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          // Reference to the replies collection
+          const repliesRef = collection(firestore, 'users', userId, 'comments', commentId, 'replies');
+          const newReplyData = {
+            text: newReply,
+            name: firstName || currentUser.email, // Use the firstName from Firestore or fallback to email
+            timestamp: Timestamp.now(), // Use Firestore timestamp
+          };
+  
+          // Add the new reply to Firestore
+          await addDoc(repliesRef, newReplyData);
+  
+          // Clear the input
+          setNewReply('');
+          setReplyCommentId(null);
+  
+          // Fetch updated comments with replies
+          const commentsSnapshot = await getDocs(collection(firestore, 'users', userId, 'comments'));
+          const commentsList = await Promise.all(
+            commentsSnapshot.docs.map(async (doc) => {
+              const repliesRef = collection(firestore, 'users', userId, 'comments', doc.id, 'replies');
+              const repliesSnapshot = await getDocs(repliesRef);
+              const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() }));
+  
+              return { id: doc.id, ...doc.data(), replies }; // Add replies to comment data
+            })
+          );
+          setComments(commentsList.sort((a, b) => b.timestamp - a.timestamp));
+        }
+      } catch (error) {
+        console.error('Error adding reply:', error);
+      }
     }
   };
-
+  
   // Toggle reply input visibility
   const handleReplyButtonClick = (commentId) => {
     setReplyCommentId(replyCommentId === commentId ? null : commentId);
@@ -227,7 +302,11 @@ const InstructorProfileScreen = ({ route }) => {
         <Text style={styles.infoText}>WhatsApp: {whatsapp}</Text>
       </View>
 
-      <Text style={styles.infoText}>Price: £{price}</Text>
+      <View style={styles.priceRow}>
+  <Text style={styles.priceLabel}>Price per hour: </Text>
+  <Text style={styles.priceValue}>£{price}</Text>
+</View>
+
       <View style={styles.ratingSection}>
   <View style={styles.starsAndVotesContainer}>
     <View style={styles.inlineContainer}>
@@ -248,8 +327,8 @@ const InstructorProfileScreen = ({ route }) => {
 </View>
 
 
-      {/* Message Button */}
-      <TouchableOpacity style={styles.messageButton}>
+    
+<TouchableOpacity style={styles.messageButton} onPress={handleMessagePress}>
         <Text style={styles.buttonText}>Message</Text>
       </TouchableOpacity>
 
@@ -502,6 +581,21 @@ const styles = StyleSheet.create({
     height: 100,  // Set the height to be the same as the width for a square
     borderRadius: 10,  // Optional: Add rounded corners for the image
   }, 
+  priceRow: {
+    flexDirection: 'row',  // Display label and price on the same line
+   
+    marginVertical: 10,  // Add some vertical spacing
+  },
+  priceLabel: {
+    fontSize: 18,  // Standard font size for the label
+    fontWeight: 'bold',  // Make the label bold
+    color: '#333',  // Darker color for the label text
+  },
+  priceValue: {
+    fontSize: 18,  // Same font size as the label
+    fontWeight: 'bold',  // Make the price bold
+    color: '#28a745',  // Green color for the price
+  },
 });
 
 export default InstructorProfileScreen;
