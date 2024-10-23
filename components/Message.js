@@ -1,34 +1,37 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { getFirestore, collection, query, where, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Import onAuthStateChanged correctly
+import { getFirestore, collection, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
-const MessagesScreen = ({ navigation }) => {
+const MessagesScreen = ({ navigation, setHasUnreadMessages }) => {
   const [conversations, setConversations] = useState([]);
-  const auth = getAuth(); // Initialize Firebase auth
-  const currentUser = auth.currentUser;
+  const auth = getAuth();
   const firestore = getFirestore();
 
   useEffect(() => {
     let unsubscribe = null;
 
-    // Function to fetch conversations
+    // Function to fetch conversations from the user's chats subcollection
     const fetchConversations = (user) => {
-      const chatsRef = collection(firestore, 'chats');
-      const q = query(chatsRef, where('participants', 'array-contains', user.uid));
+      const userChatsRef = collection(firestore, 'users', user.uid, 'chats');
 
-      unsubscribe = onSnapshot(q, (snapshot) => {
+      unsubscribe = onSnapshot(userChatsRef, (snapshot) => {
         const chatList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         setConversations(chatList);
+
+        // Check if any chat has unread messages
+        const hasUnreadMessages = chatList.some((chat) => chat.unread === true);
+        setHasUnreadMessages(hasUnreadMessages); // Update the unread status for the tab bar
       });
     };
 
     // Listen for authentication state changes
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        fetchConversations(user); // Fetch conversations when logged in
+        fetchConversations(user); // Fetch conversations when the user is logged in
       } else {
-        setConversations([]); // Clear conversations on logout
+        setConversations([]);
+        setHasUnreadMessages(false); // Reset the unread status when the user logs out
         if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
       }
     });
@@ -37,16 +40,16 @@ const MessagesScreen = ({ navigation }) => {
       if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
       authUnsubscribe(); // Cleanup authentication listener
     };
-  }, [firestore, auth]);
+  }, [firestore, auth, setHasUnreadMessages]);
 
   // Fetch profile details of the other participant
   const getOtherParticipantInfo = async (participants) => {
-    const otherParticipantId = participants.find(participant => participant !== currentUser.uid);
+    const otherParticipantId = participants.find(participant => participant !== auth.currentUser.uid);
     const otherParticipantRef = doc(firestore, 'users', otherParticipantId);
     const otherParticipantSnap = await getDoc(otherParticipantRef);
 
     if (otherParticipantSnap.exists()) {
-      return { ...otherParticipantSnap.data(), id: otherParticipantId }; // Return { firstName, lastName, profileImage, id }
+      return { ...otherParticipantSnap.data(), id: otherParticipantId }; // Return the participant's full user info
     }
     return null;
   };
@@ -76,8 +79,8 @@ const MessagesScreen = ({ navigation }) => {
                 participants={item.participants}
                 getOtherParticipantInfo={getOtherParticipantInfo}
                 lastMessage={item.lastMessage} // Assuming you have lastMessage stored
-                unread={item.unread} // Assuming 'unread' indicates whether there are unread messages
-                navigation={navigation} // Pass navigation for navigating to the instructor profile
+                unread={item.unread} // Assuming 'unread' indicates unread messages
+                navigation={navigation}
               />
             </TouchableOpacity>
           )}
@@ -101,19 +104,37 @@ const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessag
   }, [participants, getOtherParticipantInfo]);
 
   if (!otherParticipantInfo) {
-    return null; // Show loading or return null until participant info is fetched
+    return null; // Return null or a loading indicator until the participant's info is fetched
   }
 
-  // Navigate to the instructor's profile when the profile image is clicked
+  // Navigate to the appropriate profile (Instructor or Student) when the profile image is clicked
   const handleProfileImageClick = () => {
-    navigation.navigate('InstructorProfile', {
-      firstName: otherParticipantInfo.firstName,
-      lastName: otherParticipantInfo.lastName,
-      profileImage: otherParticipantInfo.profileImage,
-      userId: otherParticipantInfo.id,
-      email: otherParticipantInfo.email, // Add more info if needed
-      phone: otherParticipantInfo.phone, // Add more info if needed
-    });
+    if (otherParticipantInfo.role === 'instructor') {
+      navigation.navigate('InstructorProfile', {
+        firstName: otherParticipantInfo.firstName,
+        lastName: otherParticipantInfo.lastName,
+        phone: otherParticipantInfo.phone,
+        email: otherParticipantInfo.email,
+        whatsapp: otherParticipantInfo.whatsapp,
+        profileImage: otherParticipantInfo.profileImage,
+        price: otherParticipantInfo.price,
+        activePlan: otherParticipantInfo.activePlan,
+        userId: otherParticipantInfo.id,
+        studentsCount: otherParticipantInfo.studentsCount,
+        commentsCount: otherParticipantInfo.commentsCount,
+        rating: otherParticipantInfo.rating,
+        totalVotes: otherParticipantInfo.totalVotes,
+        carType: otherParticipantInfo.carType,
+        distance: otherParticipantInfo.distance,
+      });
+    } else if (otherParticipantInfo.role === 'student') {
+      navigation.navigate('StudentProfile', {
+        firstName: otherParticipantInfo.firstName,
+        lastName: otherParticipantInfo.lastName,
+        profileImage: otherParticipantInfo.profileImage,
+        userId: otherParticipantInfo.id,
+      });
+    }
   };
 
   return (
@@ -128,7 +149,7 @@ const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessag
         <Text style={styles.chatName}>{`${otherParticipantInfo.firstName} ${otherParticipantInfo.lastName}`}</Text>
         <Text style={styles.lastMessage}>{lastMessage || 'No messages yet'}</Text>
       </View>
-      {unread && <View style={styles.unreadIndicator} />}
+      {unread && <View style={styles.unreadIndicator} />} 
     </View>
   );
 };

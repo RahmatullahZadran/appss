@@ -7,12 +7,13 @@ import { getAuth } from 'firebase/auth';
 import Stars from 'react-native-stars'; // Star rating library for Expo
 import { AntDesign } from '@expo/vector-icons'; // Icons for stars
 import { useNavigation } from '@react-navigation/native';
-import Chat from './Chat';
+import StarRating from 'react-native-star-rating-widget';
+
 
 
 
 const InstructorProfileScreen = ({ route }) => {
-  const { firstName, lastName, phone, email, whatsapp, profileImage, price, activePlan, userId } = route.params;
+  const { firstName, lastName, phone, email, whatsapp, profileImage, price, activePlan, userId,carType } = route.params;
   const [comments, setComments] = useState([]);
   const [students, setStudents] = useState([]);
   const [newComment, setNewComment] = useState(''); // Input for new comment
@@ -90,31 +91,37 @@ const InstructorProfileScreen = ({ route }) => {
       Alert.alert('Please log in', 'You need to log in to rate.');
       return;
     }
-
-    if (!userHasVoted) {
-      try {
-        const ratingRef = doc(firestore, 'users', userId, 'ratings', currentUser.uid);
+  
+    try {
+      const ratingRef = doc(firestore, 'users', userId, 'ratings', currentUser.uid);
+      const userRatingDoc = await getDoc(ratingRef);
+  
+      if (userRatingDoc.exists()) {
+        // If the user has already voted, update their existing rating
+        await setDoc(ratingRef, { rating: newRating }, { merge: true });
+      } else {
+        // If the user hasn't voted before, create a new rating document
         await setDoc(ratingRef, { rating: newRating });
-
-        setRating(newRating);
-        setUserHasVoted(true);
-
-        // Fetch updated ratings and recalculate average
-        const ratingsRef = collection(firestore, 'users', userId, 'ratings');
-        const ratingsSnapshot = await getDocs(ratingsRef);
-        const allRatings = ratingsSnapshot.docs.map((doc) => doc.data().rating);
-        const totalRatings = allRatings.reduce((sum, rating) => sum + rating, 0);
-        const averageRating = allRatings.length > 0 ? totalRatings / allRatings.length : 0;
-
-        setAverageRating(averageRating);
-        setTotalVotes(allRatings.length);
-      } catch (error) {
-        console.error('Error submitting rating:', error);
       }
-    } else {
-      Alert.alert('You have already voted', 'You can only vote once.');
+  
+      setRating(newRating);
+      setUserHasVoted(true); // This can now simply track if they've voted at least once
+  
+      // Fetch updated ratings and recalculate average
+      const ratingsRef = collection(firestore, 'users', userId, 'ratings');
+      const ratingsSnapshot = await getDocs(ratingsRef);
+      const allRatings = ratingsSnapshot.docs.map((doc) => doc.data().rating);
+      const totalRatings = allRatings.reduce((sum, rating) => sum + rating, 0);
+      const averageRating = allRatings.length > 0 ? totalRatings / allRatings.length : 0;
+  
+      setAverageRating(averageRating);
+      setTotalVotes(allRatings.length);
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      Alert.alert('Error', 'Something went wrong while submitting your rating.');
     }
   };
+
 
   if (loading) {
     return (
@@ -128,47 +135,78 @@ const InstructorProfileScreen = ({ route }) => {
     setShowCommentInput(!showCommentInput);  // Toggle the comment input visibility
   };
   const handleMessagePress = async () => {
-    if (!currentUser) {
-      Alert.alert('Please log in', 'You need to log in to start a conversation.');
-      return;
-    }
-  
-    try {
-      const chatsRef = collection(firestore, 'chats');
-      const q = query(chatsRef, where('participants', 'array-contains', currentUser.uid));
-      const chatSnapshot = await getDocs(q);
-  
-      let existingChat = null;
-  
-      chatSnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.participants.includes(userId)) {
-          existingChat = { id: doc.id, ...data };
-        }
-      });
-  
-      let chatId;
-      if (existingChat) {
-        chatId = existingChat.id; // Use the existing chat ID
-      } else {
-        // Create a new chat
-        const newChatRef = await addDoc(collection(firestore, 'chats'), {
-          participants: [currentUser.uid, userId],
-          createdAt: Timestamp.now(),
-        });
-        chatId = newChatRef.id;
+  if (!currentUser) {
+    Alert.alert('Please log in', 'You need to log in to start a conversation.');
+    return;
+  }
+
+  // Check if the current user is trying to message themselves
+  if (currentUser.uid === userId) {
+    Alert.alert('Oops!', 'You cannot message yourself.');
+    return;
+  }
+
+  try {
+    const userChatsRef = collection(firestore, 'users', currentUser.uid, 'chats');
+    const instructorChatsRef = collection(firestore, 'users', userId, 'chats');
+
+    // Check if a chat already exists in the current user's subcollection
+    const q = query(userChatsRef, where('participants', 'array-contains', userId));
+    const chatSnapshot = await getDocs(q);
+
+    let chatId;
+    let existingChat = null;
+
+    // Check if a chat with the same participants already exists
+    chatSnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.participants.includes(userId)) {
+        existingChat = { id: doc.id, ...data };
       }
-  
-      // Navigate to the ChattingScreen
-      navigation.navigate('ChattingScreen', {
-        chatId,
-        instructorName: `${firstName} ${lastName}`,
+    });
+
+    if (existingChat) {
+      chatId = existingChat.id; // Use the existing chat ID
+    } else {
+      // No existing chat, so create a new one
+      const newChatRef = await addDoc(collection(firestore, 'chats'), {
+        participants: [currentUser.uid, userId],
+        createdAt: Timestamp.now(),
       });
-    } catch (error) {
-      console.error('Error starting conversation:', error);
-      Alert.alert('Error', 'Something went wrong while trying to start a conversation.');
+      chatId = newChatRef.id;
+
+      // Store chat metadata in both user's `chats` subcollection
+      const chatMetadata = {
+        chatId,
+        participants: [currentUser.uid, userId],
+        instructorName: `${firstName} ${lastName}`, // Instructor's name for display purposes
+        createdAt: Timestamp.now(),
+      };
+
+      // Add the new chat metadata to both users' chats subcollections
+      await setDoc(doc(firestore, 'users', currentUser.uid, 'chats', chatId), chatMetadata);
+      await setDoc(doc(firestore, 'users', userId, 'chats', chatId), chatMetadata);
     }
-  };
+
+    // Navigate to the ChattingScreen with the chatId and instructor name
+    navigation.navigate('ChattingScreen', {
+      chatId,
+      instructorName: `${firstName} ${lastName}`,
+    });
+  } catch (error) {
+    console.error('Error starting conversation:', error);
+    Alert.alert('Error', 'Something went wrong while trying to start a conversation.');
+  }
+};
+
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+      </View>
+    );
+  }
   
   // Handle adding a new comment
   const handleAddComment = async () => {
@@ -301,6 +339,11 @@ const handleAddReply = async (commentId) => {
         <Icon name="logo-whatsapp" size={24} color="green" />
         <Text style={styles.infoText}>WhatsApp: {whatsapp}</Text>
       </View>
+      <View style={styles.contactInfo}>
+  <Icon name="car-outline" size={24} color="blue" />
+  <Text style={styles.infoText}>Car Type: {carType}</Text>
+</View>
+
 
       <View style={styles.priceRow}>
   <Text style={styles.priceLabel}>Price per hour: </Text>
@@ -310,16 +353,19 @@ const handleAddReply = async (commentId) => {
       <View style={styles.ratingSection}>
   <View style={styles.starsAndVotesContainer}>
     <View style={styles.inlineContainer}>
-      <Stars
-        default={rating}
-        count={5}
-        half={true}
-        update={(newRating) => handleRatingSubmit(newRating)}
-        fullStar={<AntDesign name="star" size={24} color="gold" />}
-        emptyStar={<AntDesign name="staro" size={24} color="gold" />}
-        halfStar={<AntDesign name="starhalf" size={24} color="gold" />}
-        disabled={userHasVoted} // Disable stars after voting
-      />
+    <StarRating
+  rating={rating}
+  onChange={(newRating) => handleRatingSubmit(newRating)}
+  starSize={24} // You can adjust this size if needed
+  enableHalfStar={true} // Enable half stars
+  starStyle={{ marginHorizontal: 2 }} // Optional: Adjust the spacing between stars
+  color="gold" // Optional: Customize the star color
+  animationConfig={{
+    scale: 1.3, // Optional: Add scaling animation for a more interactive effect
+  }}
+  disabled={userHasVoted} // Disable stars after voting
+/>
+
       <Text style={styles.infoText}>{averageRating.toFixed(1)} / 5</Text>
       <Text style={styles.votesText}>({totalVotes} votes)</Text>
     </View>
@@ -410,20 +456,22 @@ const handleAddReply = async (commentId) => {
         />
       </View>
 
-      {/* Students Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Students</Text>
-        <FlatList
-          data={students}
-          keyExtractor={(item) => item.id}
-          horizontal
-          renderItem={({ item }) => (
-            <View style={styles.studentContainer}>
-              <Image source={{ uri: item.image }} style={styles.studentImage} />
-            </View>
-          )}
-        />
+ {/* Students Section */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Students</Text>
+  <FlatList
+    data={students}
+    keyExtractor={(item) => item.id}
+    renderItem={({ item }) => (
+      <View style={styles.studentContainer}>
+        <Image source={{ uri: item.image }} style={styles.studentImage} />
       </View>
+    )}
+    numColumns={3} // Display 3 students per row
+  />
+</View>
+
+
     </ScrollView>
   );
 };

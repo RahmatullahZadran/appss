@@ -9,18 +9,17 @@ import ProfileScreen from './components/profile';
 import InstructorProfileScreen from './components/instructorprofile';
 import MessagesScreen from './components/Message';
 import ChattingScreen from './components/Chat';
+import StudentProfile from './components/StudentProfile'; // Import the StudentProfile component
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import RecentlyViewedProfiles from './components/viewed';
 
-// Create Bottom Tabs and Stack Navigator
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function ProfileStack() {
   const [user, setUser] = useState(null);
 
-  // Listen to authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user ? user : null);
@@ -62,19 +61,38 @@ function SearchScreenStack() {
   );
 }
 
-// Stack Navigator for Messages and Chatting
-function MessagesStack() {
+// Stack Navigator for Messages, Chatting, InstructorProfile, and StudentProfile
+function MessagesStack({ hasUnreadMessages, setHasUnreadMessages }) {
   return (
     <Stack.Navigator>
       <Stack.Screen
         name="Messages"
-        component={MessagesScreen}
-        options={{ headerShown: true, title: 'Messages' }}
-      />
+        options={{
+          headerShown: true,
+          title: 'Messages',
+        }}
+      >
+        {props => (
+          <MessagesScreen
+            {...props}
+            setHasUnreadMessages={setHasUnreadMessages} // Pass setHasUnreadMessages to MessagesScreen
+          />
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name="ChattingScreen"
         component={ChattingScreen}
         options={{ title: 'Chat' }}
+      />
+      <Stack.Screen
+        name="InstructorProfile"
+        component={InstructorProfileScreen}
+        options={{ title: 'Instructor Profile' }}
+      />
+      <Stack.Screen
+        name="StudentProfile"
+        component={StudentProfile}
+        options={{ title: 'Student Profile' }}
       />
     </Stack.Navigator>
   );
@@ -104,6 +122,8 @@ function ViewedProfilesStack() {
 }
 
 export default function App() {
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false); // Track unread message status
+
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -134,9 +154,20 @@ export default function App() {
         />
         <Tab.Screen
           name="MessagesStack"
-          component={MessagesStack}
-          options={{ headerShown: false, title: 'Messages' }}
-        />
+          options={{
+            headerShown: false,
+            title: 'Messages',
+            tabBarBadge: hasUnreadMessages ? ' ' : null, // Show badge if unread messages exist
+          }}
+        >
+          {props => (
+            <MessagesStack
+              {...props}
+              hasUnreadMessages={hasUnreadMessages} // Pass down unread message state
+              setHasUnreadMessages={setHasUnreadMessages} // Pass down setter
+            />
+          )}
+        </Tab.Screen>
         <Tab.Screen
           name="SearchScreenStack"
           component={SearchScreenStack}
