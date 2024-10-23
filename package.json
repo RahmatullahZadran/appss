@@ -1,5 +1,5 @@
 {
-  "name": "myapp2",
+  "name": "DriveFind",
   "version": "1.0.0",
   "main": "expo/AppEntry.js",
   "scripts": {
@@ -34,7 +34,8 @@
     "react-native-star-rating-widget": "^1.9.1",
     "react-native-stars": "^1.2.2",
     "react-native-svg": "15.2.0",
-    "react-native-vector-icons": "^10.2.0"
+    "react-native-vector-icons": "^10.2.0",
+    "expo-notifications": "~0.28.19"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
