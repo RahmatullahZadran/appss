@@ -4,15 +4,16 @@ import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/aut
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';  // Import Firebase Storage
+import Constants from 'expo-constants';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAqtvPUpUAql__qIGqegAwIHdn2cQ3d_R0",
-  authDomain: "dvla-ab384.firebaseapp.com",
-  projectId: "dvla-ab384",
-  storageBucket: "dvla-ab384.appspot.com",
-  messagingSenderId: "624350859116",
-  appId: "1:624350859116:web:b68e80703373f28f366d49",
-  measurementId: "G-4ZMYMZCWY3"
+  apiKey: Constants.expoConfig?.extra?.firebaseApiKey,
+  authDomain: Constants.expoConfig?.extra?.firebaseAuthDomain,
+  projectId: Constants.expoConfig?.extra?.firebaseProjectId,
+  storageBucket: Constants.expoConfig?.extra?.firebaseStorageBucket,
+  messagingSenderId: Constants.expoConfig?.extra?.firebaseMessagingSenderId,
+  appId: Constants.expoConfig?.extra?.firebaseAppId,
+  measurementId: Constants.expoConfig?.extra?.firebaseMeasurementId,
 };
 
 // Initialize Firebase app
