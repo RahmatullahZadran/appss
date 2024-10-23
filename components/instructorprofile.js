@@ -135,69 +135,62 @@ const InstructorProfileScreen = ({ route }) => {
     setShowCommentInput(!showCommentInput);  // Toggle the comment input visibility
   };
   const handleMessagePress = async () => {
-  if (!currentUser) {
-    Alert.alert('Please log in', 'You need to log in to start a conversation.');
-    return;
-  }
-
-  // Check if the current user is trying to message themselves
-  if (currentUser.uid === userId) {
-    Alert.alert('Oops!', 'You cannot message yourself.');
-    return;
-  }
-
-  try {
-    const userChatsRef = collection(firestore, 'users', currentUser.uid, 'chats');
-    const instructorChatsRef = collection(firestore, 'users', userId, 'chats');
-
-    // Check if a chat already exists in the current user's subcollection
-    const q = query(userChatsRef, where('participants', 'array-contains', userId));
-    const chatSnapshot = await getDocs(q);
-
-    let chatId;
-    let existingChat = null;
-
-    // Check if a chat with the same participants already exists
-    chatSnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.participants.includes(userId)) {
-        existingChat = { id: doc.id, ...data };
-      }
-    });
-
-    if (existingChat) {
-      chatId = existingChat.id; // Use the existing chat ID
-    } else {
-      // No existing chat, so create a new one
-      const newChatRef = await addDoc(collection(firestore, 'chats'), {
-        participants: [currentUser.uid, userId],
-        createdAt: Timestamp.now(),
-      });
-      chatId = newChatRef.id;
-
-      // Store chat metadata in both user's `chats` subcollection
-      const chatMetadata = {
-        chatId,
-        participants: [currentUser.uid, userId],
-        instructorName: `${firstName} ${lastName}`, // Instructor's name for display purposes
-        createdAt: Timestamp.now(),
-      };
-
-      // Add the new chat metadata to both users' chats subcollections
-      await setDoc(doc(firestore, 'users', currentUser.uid, 'chats', chatId), chatMetadata);
-      await setDoc(doc(firestore, 'users', userId, 'chats', chatId), chatMetadata);
+    if (!currentUser) {
+      Alert.alert('Please log in', 'You need to log in to start a conversation.');
+      return;
     }
-
-    // Navigate to the ChattingScreen with the chatId and instructor name
-    navigation.navigate('ChattingScreen', {
-      chatId,
-      instructorName: `${firstName} ${lastName}`,
-    });
-  } catch (error) {
-    console.error('Error starting conversation:', error);
-    Alert.alert('Error', 'Something went wrong while trying to start a conversation.');
-  }
-};
+  
+    // Check if the current user is trying to message themselves
+    if (currentUser.uid === userId) {
+      Alert.alert('Oops!', 'You cannot message yourself.');
+      return;
+    }
+  
+    try {
+      const userChatsRef = collection(firestore, 'users', currentUser.uid, 'chats');
+      const instructorChatsRef = collection(firestore, 'users', userId, 'chats');
+  
+      // Check if a chat already exists in the current user's subcollection
+      const q = query(userChatsRef, where('participants', 'array-contains', userId));
+      const chatSnapshot = await getDocs(q);
+  
+      let chatId;
+      if (!chatSnapshot.empty) {
+        // If a chat already exists, get the chat ID
+        chatId = chatSnapshot.docs[0].id;
+      } else {
+        // If no chat exists, create a new chat
+        const newChatRef = await addDoc(collection(firestore, 'chats'), {
+          participants: [currentUser.uid, userId],
+          createdAt: Timestamp.now(),
+        });
+        chatId = newChatRef.id;
+  
+        // Store chat metadata in both user's `chats` subcollection
+        const chatMetadata = {
+          chatId,
+          participants: [currentUser.uid, userId],
+          instructorName: `${firstName} ${lastName}`, // Instructor's name for display
+          createdAt: Timestamp.now(),
+        };
+  
+        // Add the new chat metadata to both users' chats subcollections
+        await setDoc(doc(firestore, 'users', currentUser.uid, 'chats', chatId), chatMetadata);
+        await setDoc(doc(firestore, 'users', userId, 'chats', chatId), chatMetadata);
+      }
+  
+      // Navigate to the ChattingScreen with the chatId and instructor name
+      navigation.navigate('ChattingScreen', {
+        chatId,
+        instructorName: `${firstName} ${lastName}`,
+        participants: [currentUser.uid, userId], // Pass participants for ChattingScreen
+      });
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      Alert.alert('Error', 'Something went wrong while trying to start a conversation.');
+    }
+  };
+  
 
 
   if (loading) {
