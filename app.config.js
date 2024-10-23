@@ -1,7 +1,9 @@
-// app.config.js
 export default ({ config }) => ({
     ...config,
     extra: {
+      eas: {
+        projectId: '1ddbb52c-2865-49d0-af78-0efb8e2b98cd',  // Add this line
+      },
       firebaseApiKey: process.env.FIREBASE_API_KEY,
       firebaseAuthDomain: process.env.FIREBASE_AUTH_DOMAIN,
       firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
