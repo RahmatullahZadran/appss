@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   guidelineText: {
-    fontSize: 14,
+    fontSize: 18,
     marginLeft: 10,
     textDecorationLine: 'underline',
     color: '#007bff',
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   toggleText: {
     textAlign: 'center',
     color: '#007bff',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalContainer: {
     flex: 1,
