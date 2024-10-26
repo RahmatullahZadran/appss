@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, limit, startAfter, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
@@ -23,10 +24,10 @@ const ChattingScreen = ({ route }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [lastVisible, setLastVisible] = useState(null); // Store the last visible message for pagination
-  const [loadingMore, setLoadingMore] = useState(false); // Loading indicator for pagination
-  const flatListRef = useRef(null); // To control scrolling
-  const [isInitialLoad, setIsInitialLoad] = useState(true); // To check if it's the initial load
+  const [lastVisible, setLastVisible] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const flatListRef = useRef(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     const messagesRef = collection(firestore, 'chats', chatId, 'messages');
@@ -47,9 +48,8 @@ const ChattingScreen = ({ route }) => {
   
         setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
   
-        // Mark the chat as read for the current user
         const chatRef = doc(firestore, 'users', currentUser.uid, 'chats', chatId);
-        await updateDoc(chatRef, { unread: false }); // Mark as read
+        await updateDoc(chatRef, { unread: false });
       }
       setLoading(false);
     }, (error) => {
@@ -61,7 +61,6 @@ const ChattingScreen = ({ route }) => {
   }, [firestore, chatId]);
   
 
-  // Function to handle sending a new message
   const handleSendMessage = async () => {
     if (newMessage.trim()) {
       const messageData = {
@@ -70,7 +69,6 @@ const ChattingScreen = ({ route }) => {
         timestamp: new Date(),
       };
   
-      // Find the other participant's ID
       const otherParticipantId = route.params.participants.find(participant => participant !== currentUser.uid);
   
       if (!otherParticipantId) {
@@ -79,11 +77,9 @@ const ChattingScreen = ({ route }) => {
       }
   
       try {
-        // Add the new message to Firestore
         const messagesRef = collection(firestore, 'chats', chatId, 'messages');
         await addDoc(messagesRef, messageData);
   
-        // Mark the chat as unread for the other participant
         const chatRefOther = doc(firestore, 'users', otherParticipantId, 'chats', chatId);
         const chatRefCurrent = doc(firestore, 'users', currentUser.uid, 'chats', chatId);
   
@@ -99,7 +95,7 @@ const ChattingScreen = ({ route }) => {
         });
   
         setNewMessage('');
-        flatListRef.current?.scrollToEnd({ animated: true }); // Scroll to the bottom after sending a message
+        flatListRef.current?.scrollToEnd({ animated: true });
       } catch (error) {
         console.error('Error sending message:', error);
         Alert.alert('Error', 'Failed to send message. Please try again.');
@@ -107,9 +103,6 @@ const ChattingScreen = ({ route }) => {
     }
   };
   
-  
-
-  // Fetch more messages for pagination when scrolling to the top
   const fetchMoreMessages = async () => {
     if (loadingMore || !lastVisible) return;
 
@@ -126,7 +119,7 @@ const ChattingScreen = ({ route }) => {
         }));
 
         setMessages(prevMessages => [...moreMessages.reverse(), ...prevMessages]);
-        setLastVisible(snapshot.docs[snapshot.docs.length - 1]); // Update last visible message for pagination
+        setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
       }
       setLoadingMore(false);
     } catch (error) {
@@ -135,7 +128,6 @@ const ChattingScreen = ({ route }) => {
     }
   };
 
-  // Render each message with timestamp and avatar for received messages
   const renderMessage = ({ item }) => {
     const isSent = item.senderId === currentUser.uid;
     const messageTime = new Date(item.timestamp?.seconds * 1000).toLocaleTimeString([], {
@@ -164,42 +156,38 @@ const ChattingScreen = ({ route }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {loading ? (
-        <ActivityIndicator size="large" color="#007bff" style={styles.loadingIndicator} />
+        <ActivityIndicator size="large" color="#4caf50" style={styles.loadingIndicator} />
       ) : (
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          // Trigger pagination when scrolling to the top, not the bottom
           onScroll={({ nativeEvent }) => {
             if (nativeEvent.contentOffset.y === 0) {
               fetchMoreMessages();
             }
           }}
-          ListFooterComponent={loadingMore && <ActivityIndicator size="small" color="#007bff" />}
+          ListFooterComponent={loadingMore && <ActivityIndicator size="small" color="#4caf50" />}
           contentContainerStyle={{ paddingBottom: 20 }}
           onContentSizeChange={(contentWidth, contentHeight) => {
             if (!loadingMore && !isInitialLoad) {
               flatListRef.current?.scrollToEnd({ animated: true });
             }
-          }} // Scroll to bottom when new messages arrive
+          }}
         />
       )}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
           placeholder="Type a message"
+          placeholderTextColor="#a9a9a9"
           value={newMessage}
           onChangeText={setNewMessage}
           multiline
         />
-        <TouchableOpacity 
-          onPress={handleSendMessage} 
-          style={styles.sendButton}
-          accessibilityLabel="Send Message"
-        >
-          <Text style={styles.sendButtonText}>Send</Text>
+        <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
+          <Ionicons name="send" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -209,7 +197,7 @@ const ChattingScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f4f4',
+    backgroundColor: '#f7f8fa',
   },
   loadingIndicator: {
     flex: 1,
@@ -222,48 +210,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
+    borderColor: '#e0e0e0',
+    backgroundColor: '#ffffff',
   },
   input: {
     flex: 1,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e0e0e0',
     borderRadius: 20,
     maxHeight: 100,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f1f3f6',
     marginRight: 10,
   },
   sendButton: {
     padding: 10,
-    backgroundColor: '#007bff',
+    backgroundColor: '#4caf50',
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   sentMessageContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginVertical: 5,
+    paddingHorizontal: 10,
   },
   receivedMessageContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
     marginVertical: 5,
+    paddingHorizontal: 10,
   },
   sentMessage: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#4caf50', // Green for sent messages
     padding: 10,
     borderRadius: 15,
     maxWidth: '80%',
   },
   receivedMessage: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#2196f3', // Blue for received messages
     padding: 10,
     borderRadius: 15,
     maxWidth: '80%',
@@ -273,7 +259,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   messageTimestamp: {
-    color: '#fff',
+    color: '#e0f7fa',
     fontSize: 10,
     textAlign: 'right',
     marginTop: 5,
@@ -282,7 +268,7 @@ const styles = StyleSheet.create({
     width: 35,
     height: 35,
     borderRadius: 20,
-    backgroundColor: '#007bff',
+    backgroundColor: '#2196f3',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,

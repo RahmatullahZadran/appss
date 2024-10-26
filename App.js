@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useState, useEffect,useRef } from 'react';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,13 +9,27 @@ import ProfileScreen from './components/profile';
 import InstructorProfileScreen from './components/instructorprofile';
 import MessagesScreen from './components/Message';
 import ChattingScreen from './components/Chat';
-import StudentProfile from './components/StudentProfile'; // Import the StudentProfile component
+import StudentProfile from './components/StudentProfile';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import RecentlyViewedProfiles from './components/viewed';
+import { View, Text, Animated } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+const CustomTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: '#6200ee',
+    background: '#f2f2f7',
+    card: '#ffffff',
+    text: '#1c1c1c',
+    border: '#e0e0e0',
+    notification: '#ff3b30',
+  },
+};
 
 function ProfileStack() {
   const [user, setUser] = useState(null);
@@ -24,7 +38,7 @@ function ProfileStack() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user ? user : null);
     });
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -38,7 +52,6 @@ function ProfileStack() {
   );
 }
 
-// Stack Navigator for Search, InstructorProfile, and Chatting
 function SearchScreenStack() {
   return (
     <Stack.Navigator>
@@ -61,7 +74,6 @@ function SearchScreenStack() {
   );
 }
 
-// Stack Navigator for Messages, Chatting, InstructorProfile, and StudentProfile
 function MessagesStack({ hasUnreadMessages, setHasUnreadMessages }) {
   return (
     <Stack.Navigator>
@@ -72,10 +84,10 @@ function MessagesStack({ hasUnreadMessages, setHasUnreadMessages }) {
           title: 'Messages',
         }}
       >
-        {props => (
+        {(props) => (
           <MessagesScreen
             {...props}
-            setHasUnreadMessages={setHasUnreadMessages} // Pass setHasUnreadMessages to MessagesScreen
+            setHasUnreadMessages={setHasUnreadMessages}
           />
         )}
       </Stack.Screen>
@@ -98,7 +110,6 @@ function MessagesStack({ hasUnreadMessages, setHasUnreadMessages }) {
   );
 }
 
-// Stack Navigator for Viewed Profiles and InstructorProfile
 function ViewedProfilesStack() {
   return (
     <Stack.Navigator>
@@ -122,19 +133,19 @@ function ViewedProfilesStack() {
 }
 
 export default function App() {
-  const [hasUnreadMessages, setHasUnreadMessages] = useState(false); // Track unread message status
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={CustomTheme}>
       <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             let iconName;
 
             if (route.name === 'ProfileStack') {
-              iconName = focused ? 'person' : 'person-outline';
+              iconName = focused ? 'person-circle' : 'person-circle-outline';
             } else if (route.name === 'MessagesStack') {
-              iconName = focused ? 'chatbox' : 'chatbox-outline';
+              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
             } else if (route.name === 'SearchScreenStack') {
               iconName = focused ? 'search' : 'search-outline';
             } else if (route.name === 'ViewedProfilesStack') {
@@ -143,8 +154,10 @@ export default function App() {
 
             return <Ionicons name={iconName} size={size} color={color} />;
           },
-          tabBarActiveTintColor: 'tomato',
-          tabBarInactiveTintColor: 'gray',
+          tabBarActiveTintColor: '#6200ee',
+          tabBarInactiveTintColor: '#8e8e93',
+          tabBarBadgeStyle: { backgroundColor: '#ff3b30', color: '#ffffff' },
+          tabBarStyle: { backgroundColor: '#ffffff', borderTopColor: '#e0e0e0' },
         })}
       >
         <Tab.Screen
@@ -152,22 +165,75 @@ export default function App() {
           component={ProfileStack}
           options={{ headerShown: false, title: 'Profile' }}
         />
-        <Tab.Screen
-          name="MessagesStack"
-          options={{
-            headerShown: false,
-            title: 'Messages',
-            tabBarBadge: hasUnreadMessages ? ' ' : null, // Show badge if unread messages exist
-          }}
-        >
-          {props => (
-            <MessagesStack
-              {...props}
-              hasUnreadMessages={hasUnreadMessages} // Pass down unread message state
-              setHasUnreadMessages={setHasUnreadMessages} // Pass down setter
-            />
+<Tab.Screen
+  name="MessagesStack"
+  options={{
+    headerShown: false,
+    title: 'Messages',
+    tabBarIcon: ({ focused, color, size }) => {
+      const pulseAnim = useRef(new Animated.Value(1)).current;
+
+      useEffect(() => {
+        if (hasUnreadMessages) {
+          // Start a pulsing animation
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(pulseAnim, {
+                toValue: 1.3, // Scale up to 1.3x
+                duration: 500,
+                useNativeDriver: true,
+              }),
+              Animated.timing(pulseAnim, {
+                toValue: 1, // Scale back to normal
+                duration: 500,
+                useNativeDriver: true,
+              }),
+            ])
+          ).start();
+        } else {
+          // Reset animation when no unread messages
+          pulseAnim.setValue(1);
+        }
+      }, [hasUnreadMessages]);
+
+      return (
+        <View style={{ position: 'relative' }}>
+          <Ionicons
+            name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+            size={size}
+            color={color}
+          />
+          {hasUnreadMessages && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                right: -6,
+                top: -3,
+                backgroundColor: '#e84118',
+                borderRadius: 8,
+                height: 16,
+                width: 16,
+                justifyContent: 'center',
+                alignItems: 'center',
+                transform: [{ scale: pulseAnim }],
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>•</Text>
+            </Animated.View>
           )}
-        </Tab.Screen>
+        </View>
+      );
+    },
+  }}
+>
+  {(props) => (
+    <MessagesStack
+      {...props}
+      hasUnreadMessages={hasUnreadMessages}
+      setHasUnreadMessages={setHasUnreadMessages}
+    />
+  )}
+</Tab.Screen>
         <Tab.Screen
           name="SearchScreenStack"
           component={SearchScreenStack}
