@@ -216,31 +216,85 @@ const AuthScreen = () => {
         </TouchableOpacity>
 
         {/* Community Guidelines Modal */}
-        <Modal
-          visible={guidelinesVisible}
-          animationType="slide"
-          onRequestClose={() => setGuidelinesVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <ScrollView>
-              <Text style={styles.modalTitle}>Community Guidelines</Text>
-              <Text style={styles.guidelineContent}>
-                {/* You can fill this with your actual community guidelines */}
-                1. Respect all members.{"\n"}
-                2. No inappropriate content.{"\n"}
-                3. Follow all applicable laws.{"\n"}
-                4. Be kind and courteous.{"\n"}
-                5. Any form of harassment will not be tolerated.
-              </Text>
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setGuidelinesVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
+{/* Community Guidelines Modal */}
+<Modal
+  visible={guidelinesVisible}
+  animationType="slide"
+  onRequestClose={() => setGuidelinesVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <ScrollView>
+      <Text style={styles.modalTitle}>Privacy Policy</Text>
+      <Text style={styles.guidelineContent}>
+        Effective Date: 24/10/2024{'\n\n'}
+        
+        At EliteDrive Academy, your privacy is of paramount importance to us. This Privacy Policy outlines how we collect, use, disclose, and protect your personal information when you use our services, including our mobile application ("App"). By using the EliteDrive Academy App, you agree to the practices described in this Privacy Policy.{'\n\n'}
+
+        1. Information We Collect{'\n'}
+        a. Personal Information{'\n'}
+        Instructors: Name, email, phone number, profile picture, location (postcode or GPS), qualifications, subscription status, and other details you provide.{'\n'}
+        Students: Name, email, profile picture, location, and interactions with instructors.{'\n\n'}
+        
+        b. Usage Data{'\n'}
+        We collect data about how you interact with the app, such as search queries, feedback, comments, and interactions with instructors or students.{'\n\n'}
+        
+        c. Location Data{'\n'}
+        We collect location data (either postcode or GPS coordinates) to help students find instructors nearby.{'\n\n'}
+        
+        d. Camera and Photo Access{'\n'}
+        Instructors may upload student pictures for administrative purposes. We request camera access to allow direct photo uploads within the app.{'\n\n'}
+        
+        e. Device Information{'\n'}
+        We may collect device-specific information such as the device model, operating system, and other diagnostic data to improve app functionality.{'\n\n'}
+        
+        2. How We Use Your Information{'\n'}
+        We use your personal information to:{'\n'}
+        - Manage and create profiles for instructors and students.{'\n'}
+        - Enable students to search for instructors by location and instructors to update profiles, upload pictures, and manage student information.{'\n'}
+        - Facilitate communication between students and instructors.{'\n'}
+        - Provide location-based search results for students.{'\n'}
+        - Allow students to rate instructors and leave feedback.{'\n'}
+        - Ensure security and prevent fraud.{'\n'}
+        - Verify instructor subscription status to allow them to maintain an active account and be visible to nearby students.{'\n\n'}
+        
+        3. Subscriptions for Instructors{'\n'}
+        To maintain an active account and be displayed to nearby students, instructors are required to subscribe to one of our subscription plans:{'\n'}
+        - Weekly Subscription: A subscription plan that renews every week.{'\n'}
+        - Monthly Subscription: A subscription plan that renews every month.{'\n'}
+        Instructors with an active subscription will be shown to students in the app's search results based on their location and preferences. If a subscription is not active, the instructor's profile may not be visible to students.{'\n\n'}
+        
+        4. Data Sharing and Disclosure{'\n'}
+        We do not sell your personal data to third parties. However, we may share your data with:{'\n'}
+        - Other users, including students and instructors, through profiles, feedback, and ratings.{'\n'}
+        - Service providers to help deliver and improve our services (e.g., cloud hosting, analytics).{'\n'}
+        - Legal authorities if required by law to protect the safety and security of users.{'\n\n'}
+        
+        5. Data Security{'\n'}
+        We implement industry-standard security measures to protect your personal data. However, no method of transmission over the internet is 100% secure.{'\n\n'}
+        
+        6. Your Choices and Rights{'\n'}
+        You have the right to:{'\n'}
+        - Access your data and update or correct inaccurate information in your profile.{'\n'}
+        - Delete your account and personal data, subject to legal obligations.{'\n'}
+        - Opt out of location services by disabling GPS access on your device.{'\n\n'}
+        
+        7. Changes to This Policy{'\n'}
+        We may update this Privacy Policy from time to time. Changes will be posted on this page, and you are encouraged to review this page periodically.{'\n\n'}
+        
+        8. Contact Us{'\n'}
+        If you have any questions or concerns about our Privacy Policy, please contact us at:{'\n'}
+        Email: elitedriveacademy@outlook.com
+      </Text>
+    </ScrollView>
+    <TouchableOpacity
+      style={styles.closeButton}
+      onPress={() => setGuidelinesVisible(false)}
+    >
+      <Text style={styles.closeButtonText}>Close</Text>
+    </TouchableOpacity>
+  </View>
+</Modal>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
