@@ -17,6 +17,8 @@ const SearchScreen = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [hasSearched, setHasSearched] = useState(false); // Track if user has searched
+  const [selectedDistance, setSelectedDistance] = useState(10); // Default to 10 miles
+
 
   const navigation = useNavigation();
   const firestore = getFirestore(app);
@@ -104,8 +106,8 @@ const SearchScreen = () => {
 
   const handleSearch = async () => {
     setLoading(true);
-    const userLocation = postcode ? await geocodePostcode(postcode) : location; // Use the user's current location if postcode is not provided
-
+    const userLocation = postcode ? await geocodePostcode(postcode) : location;
+  
     if (userLocation) {
       setLocation(userLocation);
       try {
@@ -113,7 +115,7 @@ const SearchScreen = () => {
         const q = query(usersRef, where('activePlan', '!=', ''));
         const snapshot = await getDocs(q);
         const activeUsersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-
+  
         const instructorsWithCounts = await Promise.all(
           activeUsersData.map(async (instructor) => {
             const studentsCount = await getSubCollectionCount(instructor.id, 'students');
@@ -121,11 +123,12 @@ const SearchScreen = () => {
             const ratingData = await fetchInstructorRating(instructor.id);
             const distance = instructor.latitude && instructor.longitude
               ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude)
-              : null;  // Calculate distance
-            return { ...instructor, studentsCount, commentsCount, ...ratingData, distance }; // Include distance
+              : null;
+  
+            return { ...instructor, studentsCount, commentsCount, ...ratingData, distance };
           })
         );
-
+  
         let nearby = instructorsWithCounts.filter((instructor) => {
           if (instructor.latitude && instructor.longitude) {
             const distance = calculateDistance(
@@ -134,20 +137,21 @@ const SearchScreen = () => {
               instructor.latitude,
               instructor.longitude
             );
-            return distance <= 10;
+            return distance <= selectedDistance; // Use selected distance
           }
           return false;
         });
-
+  
         sortInstructors(nearby, selectedFilter);
         setNearbyInstructors(nearby);
-        setHasSearched(true); // Set to true after search is done
+        setHasSearched(true);
       } catch (error) {
         setErrorMessage('Failed to fetch instructors.');
       }
     }
     setLoading(false);
   };
+  
 
   const sortInstructors = (instructors, filter) => {
     let sortedInstructors = [...instructors];
@@ -211,6 +215,18 @@ const SearchScreen = () => {
       data={nearbyInstructors}
       keyExtractor={(item) => item.id}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      ListHeaderComponent={
+        !hasSearched ? (
+          <Text style={styles.searchRadiusText}>
+            Searching for instructors within a {selectedDistance}-mile radius
+          </Text>
+        ) : null
+      }
+      ListEmptyComponent={
+        hasSearched ? (
+          <Text style={styles.noResultsText}>No instructors found within this radius.</Text>
+        ) : null
+      }
       renderItem={({ item }) => (
         <TouchableOpacity onPress={() => handleInstructorPress(item)}>
           <View style={styles.instructorContainer}>
@@ -218,7 +234,7 @@ const SearchScreen = () => {
               <Text style={styles.instructorName}>
                 {item.firstName} {item.lastName}
               </Text>
-
+  
               <View style={styles.iconText}>
                 <Icon name="call-outline" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.phone}</Text>
@@ -231,30 +247,30 @@ const SearchScreen = () => {
                 <Icon name="logo-whatsapp" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.whatsapp}</Text>
               </View>
-
+  
               <Text style={styles.price}>£{item.price}</Text>
-
+  
               <View style={styles.iconText}>
                 <Icon name="car-outline" size={18} color="gray" />
                 <Text style={styles.iconLabel}>{item.carType}</Text>
               </View>
-
+  
               <View style={styles.ratingContainer}>
                 <View style={styles.stars}>{renderStars(item.rating || 0)}</View>
                 <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
               </View>
-
+  
               <View style={styles.iconContainer}>
                 <View style={styles.iconText}>
                   <Icon name="people-outline" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.studentsCount || 0} students</Text>
                 </View>
-
+  
                 <View style={styles.iconText}>
                   <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
                   <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
                 </View>
-
+  
                 {/* Add the distance */}
                 {item.distance !== null && (
                   <View style={styles.iconText}>
@@ -264,7 +280,7 @@ const SearchScreen = () => {
                 )}
               </View>
             </View>
-
+  
             <Image
               source={{ uri: item.profileImage || 'https://via.placeholder.com/100' }}
               style={styles.profileImage}
@@ -274,6 +290,9 @@ const SearchScreen = () => {
       )}
     />
   );
+  
+  
+  
 
   return (
     <View style={styles.container}>
@@ -287,15 +306,27 @@ const SearchScreen = () => {
           onChangeText={setPostcode}
         />
         <TouchableOpacity onPress={useCurrentLocation}>
-          <Icon name="location-outline" size={24} color="gray" />
+          <Icon name="location-outline" size={30} color="gray" />
         </TouchableOpacity>
       </View>
 
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-      <View style={styles.buttonContainer}>
-        <Button title="Search" onPress={handleSearch} />
-      </View>
+      <View style={styles.buttonDistanceContainer}>
+  <Button title="Search" onPress={handleSearch} />
+  <Picker
+    selectedValue={selectedDistance}
+    style={styles.distancePicker}
+    onValueChange={(value) => setSelectedDistance(value)}
+  >
+    <Picker.Item label="5 miles" value={5} />
+    <Picker.Item label="10 miles" value={10} />
+    <Picker.Item label="15 miles" value={15} />
+    <Picker.Item label="20 miles" value={20} />
+    <Picker.Item label="50 miles" value={50} />
+  </Picker>
+</View>
+
 
       <View style={styles.filterContainer}>
         <Text>Sort by:</Text>
@@ -355,7 +386,8 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 2,
+    marginTop: -18,
   },
   picker: {
     flex: 1,
@@ -409,6 +441,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginRight: 10,
   },
+  buttonDistanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  distancePicker: {
+    height: 40,
+    width: 150, // Adjust width as needed for dropdown options
+    marginLeft: 10, // Add space between button and picker
+  },
+  
   votesText: {
     color: 'gray',
   },
@@ -425,6 +469,28 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     color: 'gray',
   },
+  searchRadiusText: {
+    textAlign: 'center',
+    marginVertical: 10,
+    fontSize: 60,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  noResultsText: {
+    textAlign: 'center',
+    marginVertical: 20,
+    fontSize: 40,
+    color: '#888',
+  },
+  searchRadiusText: {
+    textAlign: 'center',
+    
+    marginVertical: 36,
+    fontSize: 20,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  
 });
 
 export default SearchScreen;
