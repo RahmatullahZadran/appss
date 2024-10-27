@@ -10,12 +10,12 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.3",
-    "@react-native-async-storage/async-storage": "^1.24.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-picker/picker": "2.7.5",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
-    "expo": "~51.0.28",
+    "expo": "^51.0.38",
     "expo-checkbox": "~3.0.0",
     "expo-constants": "~16.0.2",
     "expo-image-picker": "~15.0.7",
@@ -29,7 +29,9 @@
     "react-native-star-rating-widget": "^1.9.1",
     "react-native-stars": "^1.2.2",
     "react-native-svg": "15.2.0",
-    "react-native-vector-icons": "^10.2.0"
+    "react-native-vector-icons": "^10.2.0",
+    "expo-auth-session": "~5.5.2",
+    "undefined": "expo-auth-session/providers/google"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
