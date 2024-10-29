@@ -112,18 +112,19 @@ const SearchScreen = () => {
       setLocation(userLocation);
       try {
         const usersRef = collection(firestore, 'users');
-        const q = query(usersRef, where('activePlan', '!=', ''));
+        const q = query(usersRef, where('subscriptionEndDate', '>', new Date())); // Only get users with future subscriptionEndDate
         const snapshot = await getDocs(q);
-        const activeUsersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const instructorsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   
         const instructorsWithCounts = await Promise.all(
-          activeUsersData.map(async (instructor) => {
+          instructorsData.map(async (instructor) => {
             const studentsCount = await getSubCollectionCount(instructor.id, 'students');
             const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
             const ratingData = await fetchInstructorRating(instructor.id);
-            const distance = instructor.latitude && instructor.longitude
-              ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude)
-              : null;
+            const distance =
+              instructor.latitude && instructor.longitude
+                ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude)
+                : null;
   
             return { ...instructor, studentsCount, commentsCount, ...ratingData, distance };
           })
@@ -137,7 +138,7 @@ const SearchScreen = () => {
               instructor.latitude,
               instructor.longitude
             );
-            return distance <= selectedDistance; // Use selected distance
+            return distance <= selectedDistance;
           }
           return false;
         });
@@ -151,6 +152,9 @@ const SearchScreen = () => {
     }
     setLoading(false);
   };
+  
+
+  
   
 
   const sortInstructors = (instructors, filter) => {

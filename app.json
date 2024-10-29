@@ -12,15 +12,30 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rahmatullah95.MyApp2",
+      "scheme": "driveruk"  
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.rahmatullah95.MyApp2"
+      "package": "com.rahmatullah95.MyApp2",
+      "intentFilters": [  
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "driveruk",
+              "host": "driveruk.com"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
+    "scheme": "driveruk",  
     "web": {
       "favicon": "./assets/favicon.png"
     },

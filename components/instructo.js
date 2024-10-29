@@ -9,6 +9,7 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import * as ImagePicker from 'expo-image-picker';  // Image Picker
 import { Timestamp } from 'firebase/firestore'; 
 import RNPickerSelect from 'react-native-picker-select';
+import SubscriptionModal from './SubscriptionModal';
 
 const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postcode, activePlan, userId }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -36,6 +37,8 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const navigation = useNavigation();
     const [showCommentInput, setShowCommentInput] = useState(false);  // Track if the comment input is visible
     const [carType, setCarType] = useState('Both'); // Default to "Both"
+    const [isSubscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+
     
     
 
@@ -89,90 +92,15 @@ const pickerSelectStyles = {
   };
   
 
-const handleActiveButtonPress = async () => {
-    if (plan) {
-      // Ask if the user wants to cancel the plan
-      Alert.alert(
-        'Cancel Plan',
-        'Are you sure you want to cancel your active plan?',
-        [
-          {
-            text: 'No',
-            style: 'cancel',
-          },
-          {
-            text: 'Yes',
-            onPress: async () => {
-              try {
-                // Update Firestore
-                const userDocRef = doc(firestore, 'users', userId);
-                await setDoc(userDocRef, { activePlan: null }, { merge: true });
-                
-                // Optimistically update local state
-                setPlan(null);
-                Alert.alert('Cancelled', 'Your plan has been successfully cancelled.');
-  
-                // Re-fetch user data (if needed)
-                await fetchUserData();
-              } catch (error) {
-                console.error('Error cancelling plan:', error);
-                Alert.alert('Error', 'Could not cancel the plan.');
-              }
-            },
-          },
-        ]
-      );
-    } else {
-      // Ask if the user wants to activate a plan
-      Alert.alert(
-        'Choose a Plan',
-        'You are currently inactive. Would you like to activate a plan?',
-        [
-          {
-            text: 'Weekly',
-            onPress: async () => {
-              try {
-                const userDocRef = doc(firestore, 'users', userId);
-                await setDoc(userDocRef, { activePlan: 'Weekly' }, { merge: true });
-  
-                // Optimistically update local state
-                setPlan('Weekly');
-                Alert.alert('Success', 'Weekly plan activated.');
-  
-                // Re-fetch user data (if needed)
-                await fetchUserData();
-              } catch (error) {
-                console.error('Error activating Weekly plan:', error);
-                Alert.alert('Error', 'Could not activate the Weekly plan.');
-              }
-            },
-          },
-          {
-            text: 'Monthly',
-            onPress: async () => {
-              try {
-                const userDocRef = doc(firestore, 'users', userId);
-                await setDoc(userDocRef, { activePlan: 'Monthly' }, { merge: true });
-  
-                // Optimistically update local state
-                setPlan('Monthly');
-                Alert.alert('Success', 'Monthly plan activated.');
-  
-                // Re-fetch user data (if needed)
-                await fetchUserData();
-              } catch (error) {
-                console.error('Error activating Monthly plan:', error);
-                Alert.alert('Error', 'Could not activate the Monthly plan.');
-              }
-            },
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-        ]
-      );
-    }
+  const handleActiveButtonPress = () => {
+    setSubscriptionModalVisible(true); // Show subscription modal regardless of active status
+  };
+  const handleSubscriptionSuccess = async() => {
+    setPlan('Premium'); // Update the plan locally
+    setSubscriptionModalVisible(false); // Close modal
+    // Update Firestore with the subscription status
+    const userDocRef = doc(firestore, 'users', userId);
+    await setDoc(userDocRef, { activePlan: 'Premium' }, { merge: true });
   };
 
   const fetchUserRating = async () => {
@@ -573,17 +501,26 @@ const handleToggleCommentInput = () => {
           </View>
 
           {/* Active Status Button */}
-          <TouchableOpacity
-            style={[
-              styles.activeButton,
-              { backgroundColor: activePlan ? 'green' : 'red' },
-            ]}
-            onPress={handleActiveButtonPress}
-          >
-            <Text style={styles.activeButtonText}>
-              {activePlan ? 'Active' : 'Inactive'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.container}>
+      <TouchableOpacity
+        style={[styles.activeButton, { backgroundColor: activePlan ? 'green' : 'red' }]}
+        onPress={handleActiveButtonPress}
+      >
+        <Text style={styles.activeButtonText}>{activePlan ? 'Active' : 'Inactive'}</Text>
+      </TouchableOpacity>
+
+      <SubscriptionModal
+  visible={isSubscriptionModalVisible}
+  onClose={() => setSubscriptionModalVisible(false)}
+  userId={userId}
+  activePlan={plan}  // Pass the current plan to determine if the user has an active subscription
+  onSubscriptionSuccess={(newPlan) => {
+    setPlan(newPlan);  // Update the plan state based on activation or cancellation
+    setSubscriptionModalVisible(false); // Close the modal
+  }}
+/>
+
+    </View>
         </View> 
       </View>
 
