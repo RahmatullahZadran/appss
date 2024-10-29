@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, KeyboardAvoidingView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, KeyboardAvoidingView, StyleSheet, Alert } from 'react-native';
 import CheckBox from 'expo-checkbox'; // Using expo-checkbox for Expo projects
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword,sendPasswordResetEmail, } from 'firebase/auth';
 import { auth, firestore } from '../firebase';
 import { setDoc, doc } from 'firebase/firestore';  // Firestore functions
 
@@ -13,9 +13,10 @@ const AuthScreen = () => {
   const [confirmPassword, setConfirmPassword] = useState('');  // Confirm password field
   const [isLogin, setIsLogin] = useState(true);  // Toggle between login/register
   const [role, setRole] = useState('');   // Role selection during registration
-  const [agreedToGuidelines, setAgreedToGuidelines] = useState(false); // Community Guidelines
+  const [agreedToGuidelines, setAgreedToGuidelines] = useState(false); // Community Guidelindddes
   const [errors, setErrors] = useState({});      // Store validation errors
   const [guidelinesVisible, setGuidelinesVisible] = useState(false);  // To show/hide modal
+  const [resetPasswordVisible, setResetPasswordVisible] = useState(false);
 
   // Password validation regex
   const passwordValidation = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
@@ -68,7 +69,19 @@ const AuthScreen = () => {
     setErrors(errors);
     return valid;
   };
-
+  const handlePasswordReset = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email to reset your password.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      Alert.alert('Password Reset', 'Check your email for password reset instructions.');
+      setResetPasswordVisible(false);
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    }
+  };
   // Handle Login
   const handleLogin = async () => {
     if (!validateInputs()) return;
@@ -215,6 +228,31 @@ const AuthScreen = () => {
           </Text>
         </TouchableOpacity>
 
+        {isLogin && (
+          <TouchableOpacity onPress={() => setResetPasswordVisible(true)}>
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+        )}
+
+        <Modal visible={resetPasswordVisible} animationType="slide" onRequestClose={() => setResetPasswordVisible(false)}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Reset Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+            />
+            <TouchableOpacity style={styles.submitButton} onPress={handlePasswordReset}>
+              <Text style={styles.submitButtonText}>Send Reset Email</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setResetPasswordVisible(false)}>
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+
         {/* Community Guidelines Modal */}
 {/* Community Guidelines Modal */}
 <Modal
@@ -308,6 +346,12 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingVertical: 20,
     paddingHorizontal: 20,
+  },
+  forgotPasswordText: {
+    textAlign: 'center',
+    color: '#007bff',
+    fontSize: 16,
+    marginTop: 10,
   },
   title: {
     fontSize: 28,
