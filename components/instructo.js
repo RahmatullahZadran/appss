@@ -38,6 +38,8 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const [showCommentInput, setShowCommentInput] = useState(false);  // Track if the comment input is visible
     const [carType, setCarType] = useState('Both'); // Default to "Both"
     const [isSubscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+    const [subscriptionEndDate, setSubscriptionEndDate] = useState(null);
+    const [isSubscriptionActive, setIsSubscriptionActive] = useState(false);
 
     
     
@@ -343,6 +345,15 @@ const handleToggleCommentInput = () => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
   
+        if (userData.subscriptionEndDate) {
+          const endDate = userData.subscriptionEndDate.toDate();
+          setSubscriptionEndDate(endDate);
+  
+          // Check if the current date is before the subscription end date
+          setIsSubscriptionActive(new Date() < endDate);
+        }
+  
+        // Set other fields like price and rating here
         if (userData.price) {
           setPrice(userData.price);
           setUpdatedPrice(userData.price);
@@ -502,12 +513,13 @@ const handleToggleCommentInput = () => {
 
           {/* Active Status Button */}
           <View style={styles.container}>
-      <TouchableOpacity
-        style={[styles.activeButton, { backgroundColor: activePlan ? 'green' : 'red' }]}
-        onPress={handleActiveButtonPress}
-      >
-        <Text style={styles.activeButtonText}>{activePlan ? 'Active' : 'Inactive'}</Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+    style={[styles.activeButton, { backgroundColor: isSubscriptionActive ? 'green' : 'red' }]}
+    onPress={handleActiveButtonPress}
+  >
+    <Text style={styles.activeButtonText}>{isSubscriptionActive ? 'Active' : 'Inactive'}</Text>
+  </TouchableOpacity>
+  <Text style={styles.contactInfo}>Active Plan: {activePlan || 'None'}</Text>
 
       <SubscriptionModal
   visible={isSubscriptionModalVisible}
@@ -601,9 +613,6 @@ const handleToggleCommentInput = () => {
     )}
   </View>
 </View>
-
-
-      <Text style={styles.contactInfo}>Active Plan: {activePlan || 'None'}</Text>
 
       {/* Action Buttons */}
       <View style={styles.buttonRow}>
@@ -936,7 +945,7 @@ const styles = StyleSheet.create({
     activeButton: {
         padding: 10,
         borderRadius: 20,
-        marginTop: 10,
+        marginTop: -10,
         alignItems: 'center',
         justifyContent: 'center',
         width: 100,

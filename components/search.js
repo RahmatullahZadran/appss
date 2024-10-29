@@ -103,55 +103,61 @@ const SearchScreen = () => {
       return { rating: 0, totalVotes: 0 };
     }
   };
-
   const handleSearch = async () => {
     setLoading(true);
+    setErrorMessage(''); // Clear any previous error messages
     const userLocation = postcode ? await geocodePostcode(postcode) : location;
   
-    if (userLocation) {
-      setLocation(userLocation);
-      try {
-        const usersRef = collection(firestore, 'users');
-        const q = query(usersRef, where('subscriptionEndDate', '>', new Date())); // Only get users with future subscriptionEndDate
-        const snapshot = await getDocs(q);
-        const instructorsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    if (!userLocation) {
+      setErrorMessage('Failed to get location for search.');
+      setLoading(false);
+      return;
+    }
   
-        const instructorsWithCounts = await Promise.all(
-          instructorsData.map(async (instructor) => {
-            const studentsCount = await getSubCollectionCount(instructor.id, 'students');
-            const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
-            const ratingData = await fetchInstructorRating(instructor.id);
-            const distance =
-              instructor.latitude && instructor.longitude
-                ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude)
-                : null;
+    setLocation(userLocation);
   
-            return { ...instructor, studentsCount, commentsCount, ...ratingData, distance };
-          })
-        );
+    try {
+      // Define the query to fetch only active instructors
+      const usersRef = collection(firestore, 'users');
+      const q = query(
+        usersRef,
+        where('subscriptionEndDate', '>', new Date()), // Only active subscriptions
+        where('role', '==', 'instructor') // Only instructors
+      );
   
-        let nearby = instructorsWithCounts.filter((instructor) => {
-          if (instructor.latitude && instructor.longitude) {
-            const distance = calculateDistance(
-              userLocation.lat,
-              userLocation.lng,
-              instructor.latitude,
-              instructor.longitude
-            );
-            return distance <= selectedDistance;
-          }
-          return false;
-        });
-  
-        sortInstructors(nearby, selectedFilter);
-        setNearbyInstructors(nearby);
-        setHasSearched(true);
-      } catch (error) {
-        setErrorMessage('Failed to fetch instructors.');
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        setErrorMessage('No instructors found with active subscriptions.');
+        setLoading(false);
+        return;
       }
+  
+      // Map instructor data and calculate distance if necessary
+      const instructors = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        const distance = data.latitude && data.longitude
+          ? calculateDistance(userLocation.lat, userLocation.lng, data.latitude, data.longitude)
+          : null;
+  
+        return { id: doc.id, ...data, distance };
+      });
+  
+      // Filter instructors within the selected distance
+      const nearbyInstructors = instructors.filter(instructor => 
+        instructor.distance !== null && instructor.distance <= selectedDistance
+      );
+  
+      // Sort instructors based on selected filter
+      sortInstructors(nearbyInstructors, selectedFilter);
+      setNearbyInstructors(nearbyInstructors);
+      setHasSearched(true);
+    } catch (error) {
+      console.error('Error fetching instructors:', error);
+      setErrorMessage('Failed to fetch instructors. Please try again.');
     }
     setLoading(false);
   };
+  
   
 
   

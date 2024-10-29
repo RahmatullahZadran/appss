@@ -8,12 +8,13 @@ import Stars from 'react-native-stars'; // Star rating library for Expo
 import { AntDesign } from '@expo/vector-icons'; // Icons for stars
 import { useNavigation } from '@react-navigation/native';
 import StarRating from 'react-native-star-rating-widget';
+import ReportModal from './ReportModal';
 
 
 
 
 const InstructorProfileScreen = ({ route }) => {
-  const { firstName, lastName, phone, email, whatsapp, profileImage, price, activePlan, userId,carType } = route.params;
+  const { firstName, lastName, phone, email, whatsapp, profileImage, price, activePlan, userId, carType } = route.params;
   const [comments, setComments] = useState([]);
   const [students, setStudents] = useState([]);
   const [newComment, setNewComment] = useState(''); // Input for new comment
@@ -29,6 +30,8 @@ const InstructorProfileScreen = ({ route }) => {
   const [userHasVoted, setUserHasVoted] = useState(false); // Track if the user has voted
   const [rating, setRating] = useState(0); // User's selected rating
   const navigation = useNavigation();
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+
 
 
   const firestore = getFirestore(); // Initialize Firestore
@@ -85,6 +88,11 @@ const InstructorProfileScreen = ({ route }) => {
 
     fetchCommentsAndStudentsAndRating();
   }, [userId]);
+
+
+  const handleReportPress = () => {
+    setReportModalVisible(true);
+  };
 
   const handleRatingSubmit = async (newRating) => {
     if (!currentUser) {
@@ -366,10 +374,20 @@ const handleAddReply = async (commentId) => {
 </View>
 
 
-    
-<TouchableOpacity style={styles.messageButton} onPress={handleMessagePress}>
-        <Text style={styles.buttonText}>Message</Text>
-      </TouchableOpacity>
+<View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.messageButton} onPress={handleMessagePress}>
+          <Text style={styles.buttonText}>Message</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.reportButton} onPress={handleReportPress}>
+          <Text style={styles.buttonText}>Report</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ReportModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        userId={userId}
+      />
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -589,6 +607,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     borderRadius: 10,
     marginLeft: 20,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  messageButton: {
+    flex: 1,
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  reportButton: {
+    flex: 1,
+    backgroundColor: '#dc3545',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
   },
   replyText: {
     fontSize: 14,
