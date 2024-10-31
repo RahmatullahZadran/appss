@@ -83,15 +83,39 @@ const AuthScreen = () => {
     }
   };
   // Handle Login
-  const handleLogin = async () => {
-    if (!validateInputs()) return;
 
-    try {
-      await signInWithEmailAndPassword(auth, email, password);  // Log the user in
-    } catch (error) {
-      setErrors((prevErrors) => ({ ...prevErrors, auth: error.message }));
-    }
+  const handleBackToLogin = () => {
+    setResetPasswordVisible(false);
+    setIsLogin(true);
   };
+// Handle Login
+const handleLogin = async () => {
+  if (!validateInputs()) return;
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);  // Log the user in
+  } catch (error) {
+    let errorMessage = '';
+    
+    // Check the error code to provide a user-friendly error message
+    switch (error.code) {
+      case 'auth/user-not-found':
+        errorMessage = 'No user found with this email address.';
+        break;
+      case 'auth/wrong-password':
+        errorMessage = 'Incorrect password. Please try again.';
+        break;
+      case 'auth/invalid-email':
+        errorMessage = 'Invalid email format. Please check and try again.';
+        break;
+      default:
+        errorMessage = 'Login failed. Please check your credentials and try again.';
+    }
+    
+    setErrors((prevErrors) => ({ ...prevErrors, auth: errorMessage }));
+  }
+};
+
 
   // Handle Registration (Keep logged in)
   const handleRegister = async () => {
@@ -234,24 +258,31 @@ const AuthScreen = () => {
           </TouchableOpacity>
         )}
 
-        <Modal visible={resetPasswordVisible} animationType="slide" onRequestClose={() => setResetPasswordVisible(false)}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Reset Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
-            <TouchableOpacity style={styles.submitButton} onPress={handlePasswordReset}>
-              <Text style={styles.submitButtonText}>Send Reset Email</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setResetPasswordVisible(false)}>
-              <Text style={styles.closeButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
+<Modal visible={resetPasswordVisible} animationType="slide" onRequestClose={() => setResetPasswordVisible(false)}>
+  <View style={styles.modalContainer}>
+    <Text style={styles.modalTitle}>Reset Password</Text>
+    <TextInput
+      style={styles.input}
+      placeholder="Enter your email"
+      value={email}
+      onChangeText={setEmail}
+      keyboardType="email-address"
+    />
+    <TouchableOpacity style={styles.submitButton} onPress={handlePasswordReset}>
+      <Text style={styles.submitButtonText}>Send Reset Email</Text>
+    </TouchableOpacity>
+
+    {/* Back to Login Button */}
+    <TouchableOpacity onPress={handleBackToLogin}>
+      <Text style={styles.backToLoginText}>Back to Login</Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity onPress={() => setResetPasswordVisible(false)}>
+      <Text style={styles.closeButtonText}>Cancel</Text>
+    </TouchableOpacity>
+  </View>
+</Modal>
+
 
         {/* Community Guidelines Modal */}
 {/* Community Guidelines Modal */}
@@ -463,6 +494,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
   },
+  backToLoginText: {
+    textAlign: 'center',
+    color: '#007bff',
+    fontSize: 16,
+    marginTop: 10,
+  }
+  
 });
 
 export default AuthScreen;

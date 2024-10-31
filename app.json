@@ -13,8 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rahmatullah95.MyApp2",
-      "scheme": "driveruk"
+      "bundleIdentifier": "com.rahmatullah95.MyApp2"
     },
     "android": {
       "permissions": ["com.android.vending.BILLING"],
