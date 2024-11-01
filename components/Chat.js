@@ -134,14 +134,9 @@ const ChattingScreen = ({ route }) => {
       hour: '2-digit',
       minute: '2-digit',
     });
-
+  
     return (
       <View style={isSent ? styles.sentMessageContainer : styles.receivedMessageContainer}>
-        {!isSent && (
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.senderId.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
         <View style={isSent ? styles.sentMessage : styles.receivedMessage}>
           <Text style={styles.messageText}>{item.text}</Text>
           <Text style={styles.messageTimestamp}>{messageTime}</Text>
@@ -263,19 +258,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: 'right',
     marginTop: 5,
-  },
-  avatar: {
-    width: 35,
-    height: 35,
-    borderRadius: 20,
-    backgroundColor: '#2196f3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  avatarText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
 });
 

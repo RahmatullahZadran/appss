@@ -3,44 +3,64 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react
 import { getFirestore, collection, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
-const MessagesScreen = ({ navigation, setHasUnreadMessages }) => {
+const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
   const [conversations, setConversations] = useState([]);
   const auth = getAuth();
   const firestore = getFirestore();
 
   useEffect(() => {
     let unsubscribe = null;
-
-    // Function to fetch conversations from the user's chats subcollection
+  
     const fetchConversations = (user) => {
       const userChatsRef = collection(firestore, 'users', user.uid, 'chats');
-
+  
       unsubscribe = onSnapshot(userChatsRef, (snapshot) => {
-        const chatList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        let chatList = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          
+          // Log each document's timestamps and last message to verify retrieval
+          console.log("Chat ID:", doc.id);
+          console.log("createdAt:", data.createdAt);
+          console.log("timestamp:", data.timestamp);
+          console.log("lastMessage:", data.lastMessage);
+  
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
+  
+        // Sort chatList by the most recent message, using `timestamp` or fallback to `createdAt`
+        chatList = chatList.sort((a, b) => {
+          const timeA = a.timestamp?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+          const timeB = b.timestamp?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+          return timeB - timeA;
+        });
+  
         setConversations(chatList);
-
-        // Check if any chat has unread messages
-        const hasUnreadMessages = chatList.some((chat) => chat.unread === true);
-        setHasUnreadMessages(hasUnreadMessages); // Update the unread status for the tab bar
+  
+        // Calculate the count of unread messages
+        const unreadMessageCount = chatList.filter((chat) => chat.unread === true).length;
+        setUnreadMessageCount(unreadMessageCount);
       });
     };
-
-    // Listen for authentication state changes
+  
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         fetchConversations(user); // Fetch conversations when the user is logged in
       } else {
         setConversations([]);
-        setHasUnreadMessages(false); // Reset the unread status when the user logs out
+        setUnreadMessageCount(0); // Reset the unread count when the user logs out
         if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
       }
     });
-
+  
     return () => {
       if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
       authUnsubscribe(); // Cleanup authentication listener
     };
-  }, [firestore, auth, setHasUnreadMessages]);
+  }, [firestore, auth, setUnreadMessageCount]);
+  
 
   // Fetch profile details of the other participant
   const getOtherParticipantInfo = async (participants) => {
@@ -154,6 +174,7 @@ const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessag
   );
 };
 
+// Styles for both MessagesScreen and ConversationPreview components
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Alert, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
 import { purchaseSubscription } from './billing'; 
 import { firestore } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
 
 const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, activePlan }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [subscriptionEndDate, setSubscriptionEndDate] = useState(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState('Inactive'); // new field for tracking status
+  const [subscriptionStatus, setSubscriptionStatus] = useState('Inactive');
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
 
   useEffect(() => {
     fetchSubscriptionData();
@@ -45,18 +47,71 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
     }
   };
 
-  const handleActivateNow = async (subscriptionType) => {
+  const applyPromoCode = async () => {
+    if (!promoCode.trim()) {
+      setPromoError('Please enter a promo code.');
+      return;
+    }
+  
+    setPromoError('');
+    setIsLoading(true);
+  
     try {
-      await saveSubscriptionToDatabase(subscriptionType, true);
-      onSubscriptionSuccess(subscriptionType);
-      Alert.alert("Activated", `${subscriptionType === 'weekly' ? 'Weekly' : 'Monthly'} subscription activated for testing.`);
+      // Check if the promo code is valid and active
+      const promoRef = doc(firestore, 'promo', promoCode.trim());
+      const promoDoc = await getDoc(promoRef);
+  
+      if (!promoDoc.exists() || !promoDoc.data().isActive) {
+        setPromoError('Invalid or inactive promo code.');
+        setIsLoading(false);
+        return;
+      }
+  
+      // Get user document to check subscription status and end date
+      const userRef = doc(firestore, 'users', userId); // Assuming userId is available in scope
+      const userDoc = await getDoc(userRef);
+  
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const usedPromoCodes = userData.usedPromoCodes || [];
+        const subscriptionEndDate = userData.subscriptionEndDate?.toDate() || null;
+  
+        if (usedPromoCodes.includes(promoCode.trim())) {
+          setPromoError('Promo code already used.');
+          setIsLoading(false);
+          return;
+        }
+  
+        // Calculate new subscription end date (extend by 30 days)
+        const currentEndDate = subscriptionEndDate && subscriptionEndDate > new Date()
+          ? subscriptionEndDate
+          : new Date();
+        const newEndDate = new Timestamp.fromDate(new Date(currentEndDate.getTime() + 30 * 24 * 60 * 60 * 1000));
+  
+        // Update the user's document with the extended subscription end date and mark promo as used
+        await setDoc(userRef, {
+          subscriptionEndDate: newEndDate,
+          subscriptionStatus: 'Active',
+          usedPromoCodes: [...usedPromoCodes, promoCode.trim()],
+        }, { merge: true });
+  
+        Alert.alert("Promo Applied", "Your subscription has been extended by 30 days!");
+        onSubscriptionSuccess('monthly');
+      } else {
+        setPromoError("User data not found.");
+      }
     } catch (error) {
-      console.error("Activation Error:", error);
-      Alert.alert("Error", "An error occurred while activating the subscription.");
+      console.error("Promo Code Error:", error);
+      Alert.alert("Error", "An error occurred while applying the promo code.");
+    } finally {
+      setIsLoading(false);
+      setPromoCode('');
     }
   };
+  
+  
 
-  const saveSubscriptionToDatabase = async (subscriptionType, isTest = false) => {
+  const saveSubscriptionToDatabase = async (subscriptionType, isPromo = false) => {
     const currentTimestamp = Timestamp.now();
     const startDate = subscriptionEndDate && subscriptionEndDate > currentTimestamp.toDate()
       ? new Timestamp(subscriptionEndDate.getTime() / 1000, 0)
@@ -69,8 +124,8 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
       activePlan: subscriptionType,
       subscriptionStartDate: startDate,
       subscriptionEndDate: expirationDate,
-      subscriptionStatus: 'Active',  // Ensures "Active" status is saved
-      ...(isTest ? {} : { cancellationDate: null })
+      subscriptionStatus: 'Active',
+      ...(isPromo ? {} : { cancellationDate: null })
     }, { merge: true });
 
     setSubscriptionEndDate(expirationDate.toDate());
@@ -82,7 +137,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
       setIsLoading(true);
       const currentTimestamp = Timestamp.now();
       const status = subscriptionEndDate && subscriptionEndDate > currentTimestamp.toDate()
-        ? 'Active' // Remain active until the end date
+        ? 'Active'
         : 'Inactive';
 
       const userDocRef = doc(firestore, 'users', userId);
@@ -133,13 +188,6 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
                     <Text style={styles.buttonDescription}>Great for short-term visibility</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.subscribeButton, styles.activateNowButton]}
-                    onPress={() => handleActivateNow('weekly')}
-                  >
-                    <Text style={styles.buttonTitle}>Activate Now (Test)</Text>
-                  </TouchableOpacity>
-
                   <TouchableOpacity 
                     style={[styles.subscribeButton, styles.monthlyButton]} 
                     onPress={() => handleSubscription('monthly')}
@@ -149,11 +197,19 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
                     <Text style={styles.buttonDescription}>Ideal for continuous exposure</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.subscribeButton, styles.activateNowButton]}
-                    onPress={() => handleActivateNow('monthly')}
+                  <TextInput
+                    style={styles.promoInput}
+                    placeholder="Enter Promo Code"
+                    value={promoCode}
+                    onChangeText={setPromoCode}
+                  />
+                  {promoError ? <Text style={styles.errorText}>{promoError}</Text> : null}
+
+                  <TouchableOpacity 
+                    style={[styles.subscribeButton, styles.applyPromoButton]} 
+                    onPress={applyPromoCode}
                   >
-                    <Text style={styles.buttonTitle}>Activate Now (Test)</Text>
+                    <Text style={styles.buttonTitle}>Apply Promo Code</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -201,6 +257,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 15,
   },
+  promoInput: {
+    height: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    marginBottom: 15,
+  },
+  applyPromoButton: {
+    backgroundColor: '#4CAF50',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 14,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+
   modalDescription: {
     fontSize: 16,
     color: '#555',
