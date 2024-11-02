@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, Alert, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
 import { purchaseSubscription } from './billing'; 
 import { firestore } from '../firebase';
-import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
 
-const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, activePlan }) => {
+const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [subscriptionEndDate, setSubscriptionEndDate] = useState(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState('Inactive');
@@ -35,7 +35,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
       if (result.success) {
         await saveSubscriptionToDatabase(subscriptionType);
         onSubscriptionSuccess(subscriptionType);
-        Alert.alert("Success", `${subscriptionType === 'weekly' ? 'Weekly' : 'Monthly'} subscription activated!`);
+        Alert.alert("Success", `${subscriptionType === 'weekly' ? '7-Day' : '30-Day'} subscription activated!`);
       } else {
         Alert.alert("Failed", "Subscription could not be completed.");
       }
@@ -57,7 +57,6 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
     setIsLoading(true);
   
     try {
-      // Check if the promo code is valid and active
       const promoRef = doc(firestore, 'promo', promoCode.trim());
       const promoDoc = await getDoc(promoRef);
   
@@ -67,14 +66,13 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
         return;
       }
   
-      // Get user document to check subscription status and end date
-      const userRef = doc(firestore, 'users', userId); // Assuming userId is available in scope
+      const userRef = doc(firestore, 'users', userId);
       const userDoc = await getDoc(userRef);
   
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const usedPromoCodes = userData.usedPromoCodes || [];
-        const subscriptionEndDate = userData.subscriptionEndDate?.toDate() || null;
+        const currentEndDate = userData.subscriptionEndDate?.toDate() || new Date();
   
         if (usedPromoCodes.includes(promoCode.trim())) {
           setPromoError('Promo code already used.');
@@ -82,13 +80,8 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
           return;
         }
   
-        // Calculate new subscription end date (extend by 30 days)
-        const currentEndDate = subscriptionEndDate && subscriptionEndDate > new Date()
-          ? subscriptionEndDate
-          : new Date();
         const newEndDate = new Timestamp.fromDate(new Date(currentEndDate.getTime() + 30 * 24 * 60 * 60 * 1000));
   
-        // Update the user's document with the extended subscription end date and mark promo as used
         await setDoc(userRef, {
           subscriptionEndDate: newEndDate,
           subscriptionStatus: 'Active',
@@ -96,7 +89,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
         }, { merge: true });
   
         Alert.alert("Promo Applied", "Your subscription has been extended by 30 days!");
-        onSubscriptionSuccess('monthly');
+        onSubscriptionSuccess('30 days');
       } else {
         setPromoError("User data not found.");
       }
@@ -109,54 +102,25 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
     }
   };
   
-  
-
-  const saveSubscriptionToDatabase = async (subscriptionType, isPromo = false) => {
+  const saveSubscriptionToDatabase = async (subscriptionType) => {
     const currentTimestamp = Timestamp.now();
-    const startDate = subscriptionEndDate && subscriptionEndDate > currentTimestamp.toDate()
-      ? new Timestamp(subscriptionEndDate.getTime() / 1000, 0)
-      : currentTimestamp;
+    const currentEndDate = subscriptionEndDate && subscriptionEndDate > currentTimestamp.toDate()
+      ? subscriptionEndDate
+      : currentTimestamp.toDate();
     const durationInSeconds = subscriptionType === 'weekly' ? 7 * 24 * 60 * 60 : 30 * 24 * 60 * 60;
-    const expirationDate = new Timestamp(startDate.seconds + durationInSeconds, 0);
-
+    const newEndDate = new Date(currentEndDate.getTime() + durationInSeconds * 1000);
+  
     const userDocRef = doc(firestore, 'users', userId);
     await setDoc(userDocRef, {
       activePlan: subscriptionType,
-      subscriptionStartDate: startDate,
-      subscriptionEndDate: expirationDate,
+      subscriptionStartDate: currentTimestamp,
+      subscriptionEndDate: Timestamp.fromDate(newEndDate),
       subscriptionStatus: 'Active',
-      ...(isPromo ? {} : { cancellationDate: null })
+      cancellationDate: null
     }, { merge: true });
-
-    setSubscriptionEndDate(expirationDate.toDate());
+  
+    setSubscriptionEndDate(newEndDate);
     setSubscriptionStatus('Active');
-  };
-
-  const handleCancelSubscription = async () => {
-    try {
-      setIsLoading(true);
-      const currentTimestamp = Timestamp.now();
-      const status = subscriptionEndDate && subscriptionEndDate > currentTimestamp.toDate()
-        ? 'Active'
-        : 'Inactive';
-
-      const userDocRef = doc(firestore, 'users', userId);
-      await setDoc(userDocRef, {
-        activePlan: null,
-        subscriptionStatus: status,
-        cancellationDate: currentTimestamp,
-      }, { merge: true });
-
-      setSubscriptionStatus(status);
-      onSubscriptionSuccess(null);
-      Alert.alert('Canceled', 'Your subscription has been successfully canceled.');
-    } catch (error) {
-      console.error('Error canceling subscription:', error);
-      Alert.alert('Error', 'Could not cancel the subscription.');
-    } finally {
-      setIsLoading(false);
-      onClose();
-    }
   };
 
   return (
@@ -167,7 +131,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
 
           {subscriptionEndDate && (
             <Text style={styles.subscriptionInfo}>
-              {`Your subscription ${subscriptionStatus === 'Active' ? 'is active' : 'will remain active'} until ${subscriptionEndDate.toLocaleDateString()}.`}
+              {`You are ${subscriptionStatus === 'Active' ? 'active' : 'will remain active'} until ${subscriptionEndDate.toLocaleDateString()}.`}
             </Text>
           )}
 
@@ -177,49 +141,38 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
             </View>
           ) : (
             <>
-              {!activePlan ? (
-                <>
-                  <TouchableOpacity 
-                    style={[styles.subscribeButton, styles.weeklyButton]} 
-                    onPress={() => handleSubscription('weekly')}
-                  >
-                    <Text style={styles.buttonTitle}>Weekly Plan</Text>
-                    <Text style={styles.buttonPrice}>£5/week</Text>
-                    <Text style={styles.buttonDescription}>Great for short-term visibility</Text>
-                  </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.subscribeButton, styles.weeklyButton]} 
+                onPress={() => handleSubscription('weekly')}
+              >
+                <Text style={styles.buttonTitle}>7-Day Plan</Text>
+                <Text style={styles.buttonPrice}>£5 for 7 days</Text>
+                <Text style={styles.buttonDescription}>Ideal for short-term access</Text>
+              </TouchableOpacity>
 
-                  <TouchableOpacity 
-                    style={[styles.subscribeButton, styles.monthlyButton]} 
-                    onPress={() => handleSubscription('monthly')}
-                  >
-                    <Text style={styles.buttonTitle}>Monthly Plan</Text>
-                    <Text style={styles.buttonPrice}>£15/month</Text>
-                    <Text style={styles.buttonDescription}>Ideal for continuous exposure</Text>
-                  </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.subscribeButton, styles.monthlyButton]} 
+                onPress={() => handleSubscription('monthly')}
+              >
+                <Text style={styles.buttonTitle}>30-Day Plan</Text>
+                <Text style={styles.buttonPrice}>£15 for 30 days</Text>
+                <Text style={styles.buttonDescription}>Best for extended access</Text>
+              </TouchableOpacity>
 
-                  <TextInput
-                    style={styles.promoInput}
-                    placeholder="Enter Promo Code"
-                    value={promoCode}
-                    onChangeText={setPromoCode}
-                  />
-                  {promoError ? <Text style={styles.errorText}>{promoError}</Text> : null}
+              <TextInput
+                style={styles.promoInput}
+                placeholder="Enter Promo Code"
+                value={promoCode}
+                onChangeText={setPromoCode}
+              />
+              {promoError ? <Text style={styles.errorText}>{promoError}</Text> : null}
 
-                  <TouchableOpacity 
-                    style={[styles.subscribeButton, styles.applyPromoButton]} 
-                    onPress={applyPromoCode}
-                  >
-                    <Text style={styles.buttonTitle}>Apply Promo Code</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.subscribeButton, styles.cancelButton]}
-                  onPress={handleCancelSubscription}
-                >
-                  <Text style={styles.buttonTitle}>Cancel Subscription</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity 
+                style={[styles.subscribeButton, styles.applyPromoButton]} 
+                onPress={applyPromoCode}
+              >
+                <Text style={styles.buttonTitle}>Apply Promo Code</Text>
+              </TouchableOpacity>
             </>
           )}
           
@@ -231,7 +184,6 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess, ac
     </Modal>
   );
 };
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,

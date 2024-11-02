@@ -519,8 +519,6 @@ const handleToggleCommentInput = () => {
   >
     <Text style={styles.activeButtonText}>{isSubscriptionActive ? 'Active' : 'Inactive'}</Text>
   </TouchableOpacity>
-  <Text style={styles.contactInfo}>Active Plan: {activePlan || 'None'}</Text>
-
       <SubscriptionModal
   visible={isSubscriptionModalVisible}
   onClose={() => setSubscriptionModalVisible(false)}
