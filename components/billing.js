@@ -1,48 +1,119 @@
-import { requestPurchase, initConnection, endConnection } from 'react-native-iap';
+import * as RNIap from 'react-native-iap';
+import { Alert } from 'react-native';
 import { doc, setDoc } from 'firebase/firestore';
-import { firestore } from '../firebase'; // Adjust import path as needed
+import { firestore } from '../firebase';
 
-// Define the subscription product IDs
-const SEVEN_DAY_PLAN_ID = '7days'; // Use the actual Product ID for 7-day plan from Google Play Console
-const THIRTY_DAY_PLAN_ID = '30days'; // Placeholder for 30-day plan, replace with actual Product ID if created
+// Define product IDs for one-time purchases
+const SEVEN_DAY_PLAN_ID = '7days';
+const THIRTY_DAY_PLAN_ID = '30days';
+const productIds = [SEVEN_DAY_PLAN_ID, THIRTY_DAY_PLAN_ID];
 
-const purchaseSubscription = async (userId, subscriptionType) => {
-  try {
-    // Ensure a connection is established to the store
-    const isConnected = await initConnection();
-    if (!isConnected) {
-      console.error("Failed to connect to the store");
-      return { success: false, message: 'Could not connect to the store' };
+// Set up listeners for purchase updates
+let purchaseUpdateSubscription;
+let purchaseErrorSubscription;
+
+const initializePurchaseListeners = (userId) => {
+  // Listener for successful purchases
+  purchaseUpdateSubscription = RNIap.purchaseUpdatedListener(async (purchase) => {
+    const receipt = purchase.transactionReceipt;
+    if (receipt) {
+      // Process the purchase and update Firestore
+      await handlePurchaseSuccess(purchase, userId);
+      await RNIap.finishTransaction(purchase); // Acknowledge the purchase
     }
+  });
 
-    const productId = subscriptionType === '7days' ? SEVEN_DAY_PLAN_ID : THIRTY_DAY_PLAN_ID;
-    const purchase = await requestPurchase(productId);
-
-    if (purchase) {
-      // Calculate subscription end date based on purchase
-      const startDate = new Date();
-      const durationInDays = subscriptionType === '7days' ? 7 : 30;
-      const endDate = new Date(startDate.getTime() + durationInDays * 24 * 60 * 60 * 1000);
-
-      // Save the subscription info to Firestore
-      const userDocRef = doc(firestore, 'users', userId);
-      await setDoc(userDocRef, {
-        activePlan: subscriptionType,
-        subscriptionStartDate: startDate,
-        subscriptionEndDate: endDate,
-        subscriptionStatus: 'Active',
-      }, { merge: true });
-
-      return { success: true, message: 'Subscription activated!' };
-    } else {
-      return { success: false, message: 'Purchase was unsuccessful' };
-    }
-  } catch (error) {
+  // Listener for purchase errors
+  purchaseErrorSubscription = RNIap.purchaseErrorListener((error) => {
     console.error('Purchase error:', error);
-    return { success: false, error };
-  } finally {
-    await endConnection();
+    Alert.alert('Purchase Error', error.message || 'An error occurred during the purchase process.');
+  });
+};
+
+// Clean up listeners
+const removePurchaseListeners = () => {
+  if (purchaseUpdateSubscription) {
+    purchaseUpdateSubscription.remove();
+    purchaseUpdateSubscription = null;
+  }
+  if (purchaseErrorSubscription) {
+    purchaseErrorSubscription.remove();
+    purchaseErrorSubscription = null;
   }
 };
 
-export default purchaseSubscription;
+// Function to handle successful purchase and update Firestore
+const handlePurchaseSuccess = async (purchase, userId) => {
+  try {
+    const productType = purchase.productId === SEVEN_DAY_PLAN_ID ? 'weekly' : 'monthly';
+    const subscriptionDuration = productType === 'weekly' ? 7 : 30;
+    const currentDate = new Date();
+    const newEndDate = new Date(currentDate.getTime() + subscriptionDuration * 24 * 60 * 60 * 1000);
+
+    const userDocRef = doc(firestore, 'users', userId);
+    await setDoc(
+      userDocRef,
+      {
+        activePlan: productType,
+        subscriptionStartDate: currentDate,
+        subscriptionEndDate: newEndDate,
+        subscriptionStatus: 'Active',
+        cancellationDate: null,
+      },
+      { merge: true }
+    );
+
+    Alert.alert('Purchase Success', `${productType === 'weekly' ? '7-Day' : '30-Day'} access activated!`);
+  } catch (error) {
+    console.error('Error updating subscription:', error);
+    Alert.alert('Error', 'Failed to update subscription. Please try again.');
+  }
+};
+
+// Function to initiate a product purchase
+const purchaseProduct = async (userId, productType) => {
+  try {
+    // Initialize connection with a check
+    const connection = await RNIap.initConnection();
+    if (!connection) {
+      throw new Error('In-app purchases are not available on this device.');
+    }
+
+    // Initialize listeners (make sure they are set up only once)
+    initializePurchaseListeners(userId);
+
+    // Fetch available products
+    const products = await RNIap.getProducts(productIds);
+    if (products.length === 0) {
+      throw new Error('Products not found. Verify product IDs in Google Play Console.');
+    }
+    console.log('Available products:', products);
+
+    // Determine the product ID to purchase
+    const productId = productType === '7days' ? SEVEN_DAY_PLAN_ID : THIRTY_DAY_PLAN_ID;
+
+    // Request the purchase
+    await RNIap.requestPurchase(productId);
+
+    return { success: true }; // Indicate a successful purchase request
+  } catch (error) {
+    console.error('Purchase error:', error);
+    let alertMessage = error.message || 'An error occurred during the purchase process.';
+
+    // Customize error messages for common issues
+    if (error.code === 'E_IAP_NOT_AVAILABLE') {
+      alertMessage = 'In-app purchases are not available on this device.';
+    } else if (error.code === 'E_PRODUCT_NOT_AVAILABLE') {
+      alertMessage = 'Requested product is not available.';
+    }
+
+    Alert.alert('Purchase Error', alertMessage);
+    return { success: false, error: error.message };
+  } finally {
+    // Clean up connection and listeners
+    await RNIap.endConnection();
+    removePurchaseListeners();
+  }
+};
+
+export default purchaseProduct;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, Alert, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
-import { purchaseSubscription } from './billing'; 
+import purchaseProduct from './billing'; 
 import { firestore } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
@@ -27,25 +27,29 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
     }
   };
 
-  const handleSubscription = async (subscriptionType) => {
+  const handleSubscription = async (productType) => {
     setIsLoading(true);
-    const price = subscriptionType === 'weekly' ? 5 : 15;
     try {
-      const result = await purchaseSubscription(userId, subscriptionType, price);
+      const result = await purchaseProduct(userId, productType);
       if (result.success) {
-        await saveSubscriptionToDatabase(subscriptionType);
-        onSubscriptionSuccess(subscriptionType);
-        Alert.alert("Success", `${subscriptionType === 'weekly' ? '7-Day' : '30-Day'} subscription activated!`);
+        await savePurchaseToDatabase(productType);
+        onSubscriptionSuccess(productType);
+        Alert.alert("Success", `${productType === 'weekly' ? '7-Day' : '30-Day'} access purchased!`);
       } else {
-        Alert.alert("Failed", "Subscription could not be completed.");
+        Alert.alert("Failed", "Purchase could not be completed.");
       }
     } catch (error) {
-      console.error("Subscription Error:", error);
-      Alert.alert("Error", "An error occurred while processing your subscription.");
+      if (error.message === 'E_IAP_NOT_AVAILABLE') {
+        Alert.alert("IAP Error", "In-App Purchases are not available on this device.");
+      } else {
+        console.error("Purchase Error:", error);
+        Alert.alert("Error", "An error occurred while processing your purchase.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
+  
 
   const applyPromoCode = async () => {
     if (!promoCode.trim()) {
