@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "DriverUK",
-    "slug": "driveruk",
+    "slug": "MyApp2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -41,7 +41,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "e02a38bb-23c7-4a6b-8fd7-488bc2c866e8"
+        "projectId": "1ddbb52c-2865-49d0-af78-0efb8e2b98cd"
       },
       "firebaseApiKey": "YOUR_FIREBASE_API_KEY",
       "firebaseAuthDomain": "YOUR_FIREBASE_AUTH_DOMAIN",
