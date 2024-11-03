@@ -30,25 +30,29 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
   const handleSubscription = async (productType) => {
     setIsLoading(true);
     try {
+      console.log(`Initiating purchase for product type: ${productType}`);
       const result = await purchaseProduct(userId, productType);
+      console.log("Purchase result:", result);
       if (result.success) {
-        await savePurchaseToDatabase(productType);
+        console.log("Purchase successful, saving to database...");
+        await saveSubscriptionToDatabase(productType);
         onSubscriptionSuccess(productType);
         Alert.alert("Success", `${productType === 'weekly' ? '7-Day' : '30-Day'} access purchased!`);
       } else {
         Alert.alert("Failed", "Purchase could not be completed.");
       }
     } catch (error) {
+      console.error("Error in handleSubscription:", error);
       if (error.message === 'E_IAP_NOT_AVAILABLE') {
-        Alert.alert("IAP Error", "In-App Purchases assssre not available on this device.");
+        Alert.alert("IAP Error", "In-App Purchases are not available on this device.");
       } else {
-        console.error("Purchase Error:", error);
         Alert.alert("Error", "An error occurred while processing your purchase.");
       }
     } finally {
       setIsLoading(false);
     }
   };
+  
   
 
   const applyPromoCode = async () => {
