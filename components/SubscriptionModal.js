@@ -40,7 +40,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
       }
     } catch (error) {
       if (error.message === 'E_IAP_NOT_AVAILABLE') {
-        Alert.alert("IAP Error", "In-App Purchases are not available on this device.");
+        Alert.alert("IAP Error", "In-App Purchases assssre not available on this device.");
       } else {
         console.error("Purchase Error:", error);
         Alert.alert("Error", "An error occurred while processing your purchase.");
