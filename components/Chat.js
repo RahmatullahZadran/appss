@@ -10,6 +10,8 @@ import {
   Platform, 
   ActivityIndicator,
   Alert,
+  Keyboard,
+  Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, limit, startAfter, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -28,10 +30,50 @@ const ChattingScreen = ({ route }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const flatListRef = useRef(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     const messagesRef = collection(firestore, 'chats', chatId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(10));
+    const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(8));
+  
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        if (!snapshot.empty) {
+          const newMessages = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+  
+          setMessages((prevMessages) => {
+            const prevMessageIds = prevMessages.map((msg) => msg.id);
+            const filteredNewMessages = newMessages.filter(
+              (msg) => !prevMessageIds.includes(msg.id)
+            );
+  
+            return [...filteredNewMessages.reverse(), ...prevMessages];
+          });
+  
+          setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+  
+          const chatRef = doc(firestore, 'users', currentUser.uid, 'chats', chatId);
+          await updateDoc(chatRef, { unread: false });
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching messages:', error);
+        setLoading(false);
+      }
+    );
+  
+    return () => unsubscribe();
+  }, [firestore, chatId]);
+  
+
+  useEffect(() => {
+    const messagesRef = collection(firestore, 'chats', chatId, 'messages');
+    const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(8));
   
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       if (!snapshot.empty) {
@@ -134,7 +176,7 @@ const ChattingScreen = ({ route }) => {
       hour: '2-digit',
       minute: '2-digit',
     });
-  
+
     return (
       <View style={isSent ? styles.sentMessageContainer : styles.receivedMessageContainer}>
         <View style={isSent ? styles.sentMessage : styles.receivedMessage}>
@@ -164,8 +206,12 @@ const ChattingScreen = ({ route }) => {
             }
           }}
           ListFooterComponent={loadingMore && <ActivityIndicator size="small" color="#4caf50" />}
+          style={{
+            flex: 1,
+            paddingBottom: keyboardHeight, // Adjust height dynamically based on keyboard height
+          }}
           contentContainerStyle={{ paddingBottom: 20 }}
-          onContentSizeChange={(contentWidth, contentHeight) => {
+          onContentSizeChange={() => {
             if (!loadingMore && !isInitialLoad) {
               flatListRef.current?.scrollToEnd({ animated: true });
             }
@@ -238,13 +284,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   sentMessage: {
-    backgroundColor: '#4caf50', // Green for sent messages
+    backgroundColor: '#4caf50',
     padding: 10,
     borderRadius: 15,
     maxWidth: '80%',
   },
   receivedMessage: {
-    backgroundColor: '#2196f3', // Blue for received messages
+    backgroundColor: '#2196f3',
     padding: 10,
     borderRadius: 15,
     maxWidth: '80%',
@@ -258,6 +304,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: 'right',
     marginTop: 5,
+  },
+  avatar: {
+    width: 35,
+    height: 35,
+    borderRadius: 20,
+    backgroundColor: '#2196f3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

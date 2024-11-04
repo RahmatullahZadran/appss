@@ -304,26 +304,28 @@ const handleToggleCommentInput = () => {
     if (isEditing) {
       try {
         const userDocRef = doc(firestore, 'users', userId);
-    
-        // Fetch coordinates based on the postcode
-        const coordinates = await fetchCoordinates(updatedPostcode);
-    
-        if (!coordinates) {
-          return; // Exit if the postcode is invalid or coordinates can't be fetched
+  
+        // Prepare data to update based on filled fields
+        const updatedData = {};
+  
+        if (updatedPhone) updatedData.phone = updatedPhone;
+        if (updatedEmail) updatedData.email = updatedEmail;
+        if (updatedWhatsapp) updatedData.whatsapp = updatedWhatsapp;
+        if (updatedPostcode) {
+          const coordinates = await fetchCoordinates(updatedPostcode);
+          if (coordinates) {
+            updatedData.postcode = updatedPostcode;
+            updatedData.latitude = coordinates.latitude;
+            updatedData.longitude = coordinates.longitude;
+          }
         }
-    
-        // Update Firestore with the profile data and the coordinates
-        await setDoc(userDocRef, {
-          phone: updatedPhone,
-          email: updatedEmail,
-          whatsapp: updatedWhatsapp,
-          postcode: updatedPostcode,
-          price: updatedPrice,  // Save the updated price
-          carType: carType, // Save the selected car type in Firestore
-          latitude: coordinates.latitude,
-          longitude: coordinates.longitude,
-        }, { merge: true });
-    
+  
+        updatedData.price = updatedPrice;  // Always save updated price
+        updatedData.carType = carType; // Save the selected car type in Firestore
+  
+        // Update Firestore with only provided fields
+        await setDoc(userDocRef, updatedData, { merge: true });
+  
         setPrice(updatedPrice);  // Update the displayed price
         setIsEditing(false);  // Exit edit mode
         Alert.alert('Success', 'Profile updated successfully!');
@@ -519,16 +521,21 @@ const handleToggleCommentInput = () => {
   >
     <Text style={styles.activeButtonText}>{isSubscriptionActive ? 'Active' : 'Inactive'}</Text>
   </TouchableOpacity>
-      <SubscriptionModal
+  <SubscriptionModal
   visible={isSubscriptionModalVisible}
-  onClose={() => setSubscriptionModalVisible(false)}
+  onClose={() => {
+    setSubscriptionModalVisible(false); // Close the modal
+    fetchUserData(); // Refetch user data to update the active status
+  }}
   userId={userId}
   activePlan={plan}  // Pass the current plan to determine if the user has an active subscription
   onSubscriptionSuccess={(newPlan) => {
     setPlan(newPlan);  // Update the plan state based on activation or cancellation
     setSubscriptionModalVisible(false); // Close the modal
+    fetchUserData(); // Refetch user data to update the active status
   }}
 />
+
 
     </View>
         </View> 
@@ -553,7 +560,7 @@ const handleToggleCommentInput = () => {
     editable={isEditing}
     value={updatedEmail}  // Allow users to input or update the contact email
     onChangeText={setUpdatedEmail}
-    placeholder="Email"  // Show placeholder text if no email is provided
+    placeholder="Contact Email"  // Show placeholder text if no email is provided
     keyboardType="email-address"
   />
 </View>

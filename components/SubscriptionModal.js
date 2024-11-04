@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, Alert, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
-import purchaseProduct from './billing'; 
+import { initializeBilling, fetchProducts, purchaseProduct } from './billing'; 
 import { firestore } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+
+const IN_APP_PRODUCT_SKUS = ['30_days_access', '7_days_access'];
 
 const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [products, setProducts] = useState([]);
   const [subscriptionEndDate, setSubscriptionEndDate] = useState(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState('Inactive');
   const [promoCode, setPromoCode] = useState('');
   const [promoError, setPromoError] = useState('');
 
   useEffect(() => {
+    initializeBilling().then(fetchAvailableProducts);
     fetchSubscriptionData();
   }, []);
+
+  const fetchAvailableProducts = async () => {
+    const productArray = await fetchProducts(IN_APP_PRODUCT_SKUS);
+    setProducts(productArray);
+  };
 
   const fetchSubscriptionData = async () => {
     const userDocRef = doc(firestore, 'users', userId);
     const userDoc = await getDoc(userDocRef);
-
     if (userDoc.exists()) {
       const data = userDoc.data();
       setSubscriptionEndDate(data.subscriptionEndDate?.toDate());
@@ -29,38 +36,23 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
 
   const handleSubscription = async (productType) => {
     setIsLoading(true);
-    try {
-      console.log(`Initiating purchase for product type: ${productType}`);
-      const result = await purchaseProduct(userId, productType);
-      console.log("Purchase result:", result);
-      if (result.success) {
-        console.log("Purchase successful, saving to database...");
-        await saveSubscriptionToDatabase(productType);
-        onSubscriptionSuccess(productType);
-        Alert.alert("Success", `${productType === 'weekly' ? '7-Day' : '30-Day'} access purchased!`);
-      } else {
-        Alert.alert("Failed", "Purchase could not be completed.");
-      }
-    } catch (error) {
-      console.error("Error in handleSubscription:", error);
-      if (error.message === 'E_IAP_NOT_AVAILABLE') {
-        Alert.alert("IAP Error", "In-App Purchases are not available on this device.");
-      } else {
-        Alert.alert("Error", "An error occurred while processing your purchase.");
-      }
-    } finally {
-      setIsLoading(false);
+    const sku = productType === 'weekly' ? '7_days_access' : '30_days_access';
+    const result = await purchaseProduct(sku);
+    if (result.success) {
+      await saveSubscriptionToDatabase(productType);
+      onSubscriptionSuccess(productType);
+      Alert.alert("Success", `${productType === 'weekly' ? '7-Day' : '30-Day'} access purchased!`);
+    } else {
+      Alert.alert("Failed", "Purchase could not be completed.");
     }
+    setIsLoading(false);
   };
-  
-  
 
   const applyPromoCode = async () => {
     if (!promoCode.trim()) {
       setPromoError('Please enter a promo code.');
       return;
     }
-  
     setPromoError('');
     setIsLoading(true);
   
@@ -154,7 +146,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
                 onPress={() => handleSubscription('weekly')}
               >
                 <Text style={styles.buttonTitle}>7-Day Plan</Text>
-                <Text style={styles.buttonPrice}>£5 for 7 days</Text>
+                <Text style={styles.buttonPrice}>£5.99 for 7 days</Text>
                 <Text style={styles.buttonDescription}>Ideal for short-term access</Text>
               </TouchableOpacity>
 
@@ -163,7 +155,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
                 onPress={() => handleSubscription('monthly')}
               >
                 <Text style={styles.buttonTitle}>30-Day Plan</Text>
-                <Text style={styles.buttonPrice}>£15 for 30 days</Text>
+                <Text style={styles.buttonPrice}>£17.99 for 30 days</Text>
                 <Text style={styles.buttonDescription}>Best for extended access</Text>
               </TouchableOpacity>
 
