@@ -202,15 +202,16 @@ const handleLogin = async () => {
 
             {/* Community Guidelines Checkbox */}
             <View style={styles.guidelineContainer}>
-              <CheckBox
-                value={agreedToGuidelines}
-                onValueChange={setAgreedToGuidelines}
-              />
-              <TouchableOpacity onPress={() => setGuidelinesVisible(true)}>
-                <Text style={styles.guidelineText}>I agree to the community guidelines</Text>
-              </TouchableOpacity>
-            </View>
-            {errors.guidelines && <Text style={styles.errorText}>{errors.guidelines}</Text>}
+  <CheckBox
+    value={agreedToGuidelines}
+    onValueChange={setAgreedToGuidelines}
+    style={styles.checkbox} // Apply the custom style for sizing
+  />
+  <TouchableOpacity onPress={() => setGuidelinesVisible(true)}>
+    <Text style={styles.guidelineText}>I agree to the community guidelines</Text>
+  </TouchableOpacity>
+</View>
+
 
             {/* Role Selection */}
             <View style={styles.roleSelection}>
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     textAlign: 'center',
     color: '#007bff',
-    fontSize: 16,
+    fontSize: 20,
     marginTop: 10,
   },
   title: {
@@ -403,7 +404,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: 'red',
-    fontSize: 12,
+    fontSize: 14,
     marginBottom: 10,
   },
   roleSelection: {
@@ -445,7 +446,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   guidelineText: {
-    fontSize: 18,
+    fontSize: 20,
     marginLeft: 10,
     textDecorationLine: 'underline',
     color: '#007bff',
@@ -466,7 +467,7 @@ const styles = StyleSheet.create({
   toggleText: {
     textAlign: 'center',
     color: '#007bff',
-    fontSize: 17,
+    fontSize: 20,
   },
   modalContainer: {
     flex: 1,
@@ -478,6 +479,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  checkbox: {
+    width: 24,  // Set desired width
+    height: 24, // Set desired height
   },
   guidelineContent: {
     fontSize: 16,
@@ -497,7 +502,7 @@ const styles = StyleSheet.create({
   backToLoginText: {
     textAlign: 'center',
     color: '#007bff',
-    fontSize: 16,
+    fontSize: 20,
     marginTop: 10,
   }
   

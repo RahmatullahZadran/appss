@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, Alert, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Alert, ActivityIndicator, TextInput, StyleSheet, Animated } from 'react-native';
 import { initializeBilling, fetchProducts, purchaseProduct } from './billing'; 
 import { firestore } from '../firebase';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+
 
 const IN_APP_PRODUCT_SKUS = ['30_days_access', '7_days_access'];
 
@@ -13,11 +14,15 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
   const [subscriptionStatus, setSubscriptionStatus] = useState('Inactive');
   const [promoCode, setPromoCode] = useState('');
   const [promoError, setPromoError] = useState('');
+  const [fadeAnim] = useState(new Animated.Value(0)); // New fade animation
 
   useEffect(() => {
-    initializeBilling().then(fetchAvailableProducts);
-    fetchSubscriptionData();
-  }, []);
+    if (visible) {
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      initializeBilling().then(fetchAvailableProducts);
+      fetchSubscriptionData();
+    }
+  }, [visible]);
 
   const fetchAvailableProducts = async () => {
     const productArray = await fetchProducts(IN_APP_PRODUCT_SKUS);
@@ -126,7 +131,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
   return (
     <Modal visible={visible} transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <Animated.View style={[styles.modalContent, { opacity: fadeAnim }]}>
           <Text style={styles.modalTitle}>Manage Subscription</Text>
 
           {subscriptionEndDate && (
@@ -144,6 +149,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
               <TouchableOpacity 
                 style={[styles.subscribeButton, styles.weeklyButton]} 
                 onPress={() => handleSubscription('weekly')}
+                activeOpacity={0.8}
               >
                 <Text style={styles.buttonTitle}>7-Day Plan</Text>
                 <Text style={styles.buttonPrice}>£5.99 for 7 days</Text>
@@ -153,6 +159,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
               <TouchableOpacity 
                 style={[styles.subscribeButton, styles.monthlyButton]} 
                 onPress={() => handleSubscription('monthly')}
+                activeOpacity={0.8}
               >
                 <Text style={styles.buttonTitle}>30-Day Plan</Text>
                 <Text style={styles.buttonPrice}>£17.99 for 30 days</Text>
@@ -164,22 +171,24 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
                 placeholder="Enter Promo Code"
                 value={promoCode}
                 onChangeText={setPromoCode}
+                placeholderTextColor="#999"
               />
               {promoError ? <Text style={styles.errorText}>{promoError}</Text> : null}
 
               <TouchableOpacity 
                 style={[styles.subscribeButton, styles.applyPromoButton]} 
                 onPress={applyPromoCode}
+                activeOpacity={0.8}
               >
                 <Text style={styles.buttonTitle}>Apply Promo Code</Text>
               </TouchableOpacity>
             </>
           )}
           
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
-        </View>
+         <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
+  <Text style={styles.closeButtonText}>Close</Text>
+</TouchableOpacity>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -187,7 +196,7 @@ const SubscriptionModal = ({ visible, onClose, userId, onSubscriptionSuccess }) 
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Slightly darker overlay
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -198,19 +207,19 @@ const styles = StyleSheet.create({
     width: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 15,
+    shadowOpacity: 0.25,
+    shadowRadius: 15, // Softer shadow
+    elevation: 20,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 24, // Larger title
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
   },
   promoInput: {
-    height: 40,
+    height: 45,
     borderColor: '#ddd',
     borderWidth: 1,
     borderRadius: 10,
@@ -218,20 +227,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   applyPromoButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#34C759', // Bright green for visibility
   },
   errorText: {
-    color: 'red',
+    color: '#d9534f', // Slightly softer red for error
     fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
     marginBottom: 10,
-    textAlign: 'center',
-  },
-
-  modalDescription: {
-    fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 25,
   },
   subscriptionInfo: {
     fontSize: 16,
@@ -252,16 +255,10 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   weeklyButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#5C9EAD',
   },
   monthlyButton: {
     backgroundColor: '#007bff',
-  },
-  activateNowButton: {
-    backgroundColor: '#FFD700',
-  },
-  cancelButton: {
-    backgroundColor: '#ff4d4d',
   },
   buttonTitle: {
     fontSize: 18,
@@ -282,14 +279,28 @@ const styles = StyleSheet.create({
   closeButton: {
     marginTop: 15,
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 45,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#007bff',
+    
   },
   closeButtonText: {
     color: '#007bff',
-    fontSize: 16,
+    fontSize: 25,
+    fontWeight: '600',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)', // Softer background during loading
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,

@@ -306,8 +306,6 @@ const SearchScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Search for Active Instructors</Text>
-
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -316,30 +314,31 @@ const SearchScreen = () => {
           onChangeText={setPostcode}
         />
         <TouchableOpacity onPress={useCurrentLocation}>
-          <Icon name="location-outline" size={30} color="gray" />
+          <Icon name="location-outline" size={30} color="gray" style={styles.locationIcon} />
         </TouchableOpacity>
       </View>
 
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       <View style={styles.buttonDistanceContainer}>
-  <Button title="Search" onPress={handleSearch} />
-  <Picker
-    selectedValue={selectedDistance}
-    style={styles.distancePicker}
-    onValueChange={(value) => setSelectedDistance(value)}
-  >
-    <Picker.Item label="5 miles" value={5} />
-    <Picker.Item label="10 miles" value={10} />
-    <Picker.Item label="15 miles" value={15} />
-    <Picker.Item label="20 miles" value={20} />
-    <Picker.Item label="50 miles" value={50} />
-  </Picker>
-</View>
-
+        <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+          <Text style={styles.searchButtonText}>Search</Text>
+        </TouchableOpacity>
+        <Picker
+          selectedValue={selectedDistance}
+          style={styles.distancePicker}
+          onValueChange={(value) => setSelectedDistance(value)}
+        >
+          <Picker.Item  label="5 miles" value={5} />
+          <Picker.Item label="10 miles" value={10} />
+          <Picker.Item label="15 miles" value={15} />
+          <Picker.Item label="20 miles" value={20} />
+          <Picker.Item label="50 miles" value={50} />
+        </Picker>
+      </View>
 
       <View style={styles.filterContainer}>
-        <Text>Sort by:</Text>
+        <Text style={styles.filterText}>Sort by:</Text>
         <Picker
           selectedValue={selectedFilter}
           style={styles.picker}
@@ -363,60 +362,97 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FAFAFA',
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     marginBottom: 20,
     textAlign: 'center',
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2E3A59',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: 'gray',
+    borderColor: '#B0B0B0',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 10,
     paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   input: {
     flex: 1,
-    height: 40,
+    height: 48,
+    padding: 5,
+    fontSize: 16,
+    color: '#333',
   },
   errorText: {
-    color: 'red',
+    color: '#FF4D4D',
     marginBottom: 15,
     textAlign: 'center',
+    fontSize: 14,
   },
-  buttonContainer: {
-    marginBottom: 10,
+  buttonDistanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  searchButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 8, // Increases height
+    paddingHorizontal: 20, // Adds width
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  searchButtonText: {
+    color: '#FFFFFF',
+    fontSize: 23, // Increase font size
+    fontWeight: 'bold',
   },
   filterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
-    marginTop: -18,
+    marginBottom: 15,
+    paddingHorizontal: 5,
+    
   },
   picker: {
     flex: 1,
     height: 40,
+    fontSize: 14,
+    color: '#333',
+    backgroundColor: '#F0F0F0',
     borderRadius: 8,
+  },
+  distancePicker: {
+    height: 48,
+    width: 160,
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 10,
   },
   instructorContainer: {
     padding: 15,
-    backgroundColor: '#fff',
-    marginBottom: 10,
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 5,
     elevation: 3,
   },
@@ -424,23 +460,29 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 15,
   },
+  locationIcon: {
+    marginRight: 5,
+    color: '#007AFF',
+    fontSize: 35,
+  },
   profileImage: {
     width: 80,
     height: 80,
     borderRadius: 40,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
   },
   instructorName: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 5,
+    fontWeight: '600',
+    fontSize: 18,
+    color: '#2E3A59',
+    marginBottom: 8,
   },
   price: {
-    fontSize: 18,
-    color: 'green',
-    fontWeight: 'bold',
-    marginTop: 5,
+    fontSize: 16,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginTop: 8,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -451,20 +493,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginRight: 10,
   },
-  buttonDistanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  distancePicker: {
-    height: 40,
-    width: 150, // Adjust width as needed for dropdown options
-    marginLeft: 10, // Add space between button and picker
-  },
-  
   votesText: {
-    color: 'gray',
+    color: '#777',
+    fontSize: 12,
   },
   iconContainer: {
     flexDirection: 'row',
@@ -476,31 +507,30 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   iconLabel: {
-    marginLeft: 5,
-    color: 'gray',
+    marginLeft: 6,
+    color: '#555',
   },
   searchRadiusText: {
     textAlign: 'center',
-    marginVertical: 10,
-    fontSize: 60,
-    color: '#666',
+    marginVertical: 16,
+    fontSize: 22,
+    color: '#7A7A7A',
     fontStyle: 'italic',
+  },
+  filterText : {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
   noResultsText: {
     textAlign: 'center',
     marginVertical: 20,
-    fontSize: 40,
+    fontSize: 16,
     color: '#888',
   },
-  searchRadiusText: {
-    textAlign: 'center',
-    
-    marginVertical: 36,
-    fontSize: 20,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  
 });
+
+
+
 
 export default SearchScreen;
