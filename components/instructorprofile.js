@@ -9,12 +9,13 @@ import { AntDesign } from '@expo/vector-icons'; // Icons for stars
 import { useNavigation } from '@react-navigation/native';
 import StarRating from 'react-native-star-rating-widget';
 import ReportModal from './ReportModal';
+import FancyAlert from './fancyalert';
 
 
 
 
 const InstructorProfileScreen = ({ route }) => {
-  const { firstName, lastName, phone, email, whatsapp, profileImage, price, activePlan, userId, carType } = route.params;
+  const { firstName, lastName, phone, email, whatsapp, profileImage, price, activePlan, userId, carType, distance, gender } = route.params;
   const [comments, setComments] = useState([]);
   const [students, setStudents] = useState([]);
   const [newComment, setNewComment] = useState(''); // Input for new comment
@@ -31,6 +32,11 @@ const InstructorProfileScreen = ({ route }) => {
   const [rating, setRating] = useState(0); // User's selected rating
   const navigation = useNavigation();
   const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+const [alertTitle, setAlertTitle] = useState('');
+const [alertMessage, setAlertMessage] = useState('');
+const [alertIcon, setAlertIcon] = useState('alert-circle');
+  
 
 
 
@@ -88,6 +94,12 @@ const InstructorProfileScreen = ({ route }) => {
 
     fetchCommentsAndStudentsAndRating();
   }, [userId]);
+  const showFancyAlert = (title, message, icon = 'alert-circle') => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertIcon(icon);
+    setAlertVisible(true);
+  };
 
 
   const handleReportPress = () => {
@@ -96,7 +108,7 @@ const InstructorProfileScreen = ({ route }) => {
 
   const handleRatingSubmit = async (newRating) => {
     if (!currentUser) {
-      Alert.alert('Please log in', 'You need to log in to rate.');
+      showFancyAlert('Please log in', 'You need to log in to rate.');
       return;
     }
   
@@ -126,7 +138,7 @@ const InstructorProfileScreen = ({ route }) => {
       setTotalVotes(allRatings.length);
     } catch (error) {
       console.error('Error submitting rating:', error);
-      Alert.alert('Error', 'Something went wrong while submitting your rating.');
+      showFancyAlert('Error', 'Something went wrong while submitting your rating.');
     }
   };
 
@@ -144,13 +156,13 @@ const InstructorProfileScreen = ({ route }) => {
   };
   const handleMessagePress = async () => {
     if (!currentUser) {
-      Alert.alert('Please log in', 'You need to log in to start a conversation.');
+      showFancyAlert('Please log in', 'You need to log in to start a conversation.');
       return;
     }
   
     // Check if the current user is trying to message themselves
     if (currentUser.uid === userId) {
-      Alert.alert('Oops!', 'You cannot message yourself.');
+      showFancyAlert('Oops!', 'You cannot message yourself.');
       return;
     }
   
@@ -195,7 +207,7 @@ const InstructorProfileScreen = ({ route }) => {
       });
     } catch (error) {
       console.error('Error starting conversation:', error);
-      Alert.alert('Error', 'Something went wrong while trying to start a conversation.');
+      showFancyAlert('Error', 'Something went wrong while trying to start a conversation.');
     }
   };
   
@@ -213,7 +225,7 @@ const InstructorProfileScreen = ({ route }) => {
   const handleAddComment = async () => {
     if (!currentUser) {
       // Show an alert if the user is not logged in
-      Alert.alert('Please log in', 'You need to log in to comment.');
+      showFancyAlert('Please log in', 'You need to log in to comment.');
       return; // Exit the function if the user is not logged in
     }
 
@@ -254,7 +266,7 @@ const InstructorProfileScreen = ({ route }) => {
 // Handle adding a reply to a comment
 const handleAddReply = async (commentId) => {
     if (!currentUser) {
-      Alert.alert('Please log in', 'You need to log in to reply.');
+      showFancyAlert('Please log in', 'You need to log in to reply.');
       return;
     }
   
@@ -325,7 +337,10 @@ const handleAddReply = async (commentId) => {
       {/* Instructor Profile Details */}
       <Image source={{ uri: profileImage || 'https://via.placeholder.com/150' }} style={styles.profileImage} />
       <Text style={styles.profileName}>{`${firstName} ${lastName}`}</Text>
-
+      <View style={styles.contactInfo}>
+  <Icon name="person-outline" size={24} color="purple" />
+  <Text style={styles.infoText}>Gender: {gender || 'Not specified'}</Text>
+</View>
       <View style={styles.contactInfo}>
         <Icon name="call-outline" size={24} color="green" />
         <Text style={styles.infoText}>Phone: {phone}</Text>
@@ -351,22 +366,21 @@ const handleAddReply = async (commentId) => {
   <Text style={styles.priceValue}>£{price}</Text>
 </View>
 
-      <View style={styles.ratingSection}>
+<View style={styles.ratingSection}>
   <View style={styles.starsAndVotesContainer}>
     <View style={styles.inlineContainer}>
-    <StarRating
-  rating={rating}
-  onChange={(newRating) => handleRatingSubmit(newRating)}
-  starSize={24} // You can adjust this size if needed
-  enableHalfStar={true} // Enable half stars
-  starStyle={{ marginHorizontal: 2 }} // Optional: Adjust the spacing between stars
-  color="gold" // Optional: Customize the star color
-  animationConfig={{
-    scale: 1.3, // Optional: Add scaling animation for a more interactive effect
-  }}
-  disabled={userHasVoted} // Disable stars after voting
-/>
-
+      <StarRating
+        rating={rating}
+        onChange={(newRating) => handleRatingSubmit(newRating)}
+        starSize={24}
+        enableHalfStar={true}
+        starStyle={{ marginHorizontal: 2 }}
+        color="gold"
+        animationConfig={{
+          scale: 1.3,
+        }}
+        disabled={userHasVoted}
+      />
       <Text style={styles.infoText}>{averageRating.toFixed(1)} / 5</Text>
       <Text style={styles.votesText}>({totalVotes} votes)</Text>
     </View>
@@ -390,12 +404,12 @@ const handleAddReply = async (commentId) => {
       />
 
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Comments</Text>
-          <TouchableOpacity onPress={handleToggleCommentInput} style={styles.commentInputButton}>
-            <Icon name={showCommentInput ? "remove-circle-outline" : "add-circle-outline"} size={24} color="#007bff" />
-          </TouchableOpacity>
-        </View>
+      <View style={styles.sectionHeader}>
+  <Text style={styles.sectionTitle}>Comments</Text>
+  <TouchableOpacity onPress={handleToggleCommentInput} style={styles.commentInputButton}>
+    <Icon name={showCommentInput ? "remove-circle-outline" : "add-circle-outline"} size={24} color="#007bff" />
+  </TouchableOpacity>
+</View>
         {showCommentInput && (
           <View style={styles.commentInputContainer}>
             <TextInput
@@ -481,9 +495,18 @@ const handleAddReply = async (commentId) => {
     numColumns={3} // Display 3 students per row
   />
 </View>
+<FancyAlert
+  visible={alertVisible}
+  onClose={() => setAlertVisible(false)}
+  title={alertTitle}
+  message={alertMessage}
+  icon={alertIcon}
+/>
+
 
 
     </ScrollView>
+    
   );
 };
 
@@ -491,194 +514,230 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#e5eaf0', // Softer background
   },
   scrollViewContent: {
-    paddingBottom: 50, // Add padding to the bottom to ensure the last item is fully visible
+    paddingBottom: 50,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  commentInputButton: {
-    position: 'absolute',
-    top: 26,
-    right: 5,
-  },
   profileImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     alignSelf: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
+    borderWidth: 3,
+    borderColor: '#ddd',
   },
   profileName: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 20,
+    color: '#333',
+    marginBottom: 8,
   },
   contactInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginVertical: 5,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   infoText: {
     fontSize: 16,
-    marginLeft: 10,
+    marginLeft: 12,
+    color: '#333',
   },
-  messageButton: {
-    backgroundColor: '#007bff',
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 10,
+    backgroundColor: '#f8fafb',
     padding: 15,
     borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  priceLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#555',
+  },
+  priceValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a7f37',
+    marginLeft: 8,
+  },
+  ratingSection: {
+    marginVertical: 12,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  inlineContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+  },
+  votesText: {
+    fontSize: 14,
+    color: '#555',
+    marginLeft: 6,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 15,
+  },
+  messageButton: {
+    flex: 1,
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginRight: 8,
+    shadowColor: '#007bff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  reportButton: {
+    flex: 1,
+    backgroundColor: '#dc3545',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#dc3545',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '600',
   },
-  commentsSection: {
-    marginBottom: 20,
+  section: {
+    marginVertical: 10,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
+    color: '#333',
   },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginBottom: 20,
+    marginVertical: 10,
+    backgroundColor: '#f9f9f9',
   },
   commentInput: {
     flex: 1,
-    padding: 10,
+    padding: 8,
     fontSize: 16,
+    color: '#333',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // Place icon on the same line as the title
+    alignItems: 'center',
+    marginBottom: 10,
   },
   commentContainer: {
     padding: 10,
     backgroundColor: '#f8f8f8',
-    borderRadius: 10,
+    borderRadius: 8,
     marginBottom: 10,
+    borderColor: '#ddd',
+    borderWidth: 1,
   },
   commentText: {
     fontSize: 16,
-  },
-  commenterName: {
-    fontWeight: 'bold',
+    color: '#444',
   },
   commentTimestamp: {
     fontSize: 12,
-    color: '#999',
-    marginTop: 5,
+    color: '#666',
+    marginTop: 4,
   },
-  replyButton: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
+  studentContainer: {
+    flex: 1,
+    alignItems: 'center',
+    margin: 10, // Adds even spacing between images
+  }, replyButton: {
+    position: 'absolute', // Positions the button absolutely within the comment container
+    top: 8, // Distance from the top edge
+    right: 8, // Distance from the right edge
+  },
+  studentImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 15, // Optional: slight rounding of image corners
+  },
+  replyContainer: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#f0f0f5',
+    borderRadius: 8,
+    marginLeft: 20,
+  },
+  replyText: {
+    fontSize: 14,
+    color: '#333',
   },
   replyInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 5,
     marginTop: 10,
     marginLeft: 20,
+    backgroundColor: '#f9f9f9',
   },
   replyInput: {
     flex: 1,
-    padding: 10,
+    padding: 8,
     fontSize: 16,
+    color: '#333',
   },
-  replyContainer: {
+  studentImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
     marginBottom: 10,
-    padding: 10,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 10,
-    marginLeft: 20,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  messageButton: {
-    flex: 1,
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  reportButton: {
-    flex: 1,
-    backgroundColor: '#dc3545',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-  },
-  replyText: {
-    fontSize: 14,
-  },
-  replyerName: {
-    fontWeight: 'bold',
-  },
-  
-  replyTimestamp: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 5,
-  },
-  showMoreText: {
-    color: '#007bff',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  inlineContainer: {
-    flexDirection: 'row', // This ensures the children are aligned in a row
-    justifyContent: 'space-between', // Distributes space between stars, rating, and votes
-    alignItems: 'center', // Align items vertically
-    width: '100%', // Adjust this width based on your layout needs
-  },
-  
-  studentContainer: {
-    marginRight: 15,
-  },
-  studentImage: { 
-    width: 100,  // Set the width for the square image
-    height: 100,  // Set the height to be the same as the width for a square
-    borderRadius: 10,  // Optional: Add rounded corners for the image
-  }, 
-  priceRow: {
-    flexDirection: 'row',  // Display label and price on the same line
-   
-    marginVertical: 10,  // Add some vertical spacing
-  },
-  priceLabel: {
-    fontSize: 18,  // Standard font size for the label
-    fontWeight: 'bold',  // Make the label bold
-    color: '#333',  // Darker color for the label text
-  },
-  priceValue: {
-    fontSize: 18,  // Same font size as the label
-    fontWeight: 'bold',  // Make the price bold
-    color: '#28a745',  // Green color for the price
   },
 });
+
+
 
 export default InstructorProfileScreen;

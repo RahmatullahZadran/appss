@@ -10,41 +10,39 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
 
   useEffect(() => {
     let unsubscribe = null;
-  
+
     const fetchConversations = (user) => {
       const userChatsRef = collection(firestore, 'users', user.uid, 'chats');
-  
+
       unsubscribe = onSnapshot(userChatsRef, (snapshot) => {
         let chatList = snapshot.docs.map((doc) => {
           const data = doc.data();
-          
-          // Log each document's timestamps and last message to verify retrieval
-          console.log("Chat ID:", doc.id);
-          console.log("createdAt:", data.createdAt);
-          console.log("timestamp:", data.timestamp);
-          console.log("lastMessage:", data.lastMessage);
-  
           return {
             id: doc.id,
             ...data
           };
         });
-  
+
+        // Filter out chats where the last message was sent by the current user to avoid irrelevant updates
+        chatList = chatList.filter(
+          (chat) => chat.lastMessage?.senderId !== user.uid
+        );
+
         // Sort chatList by the most recent message, using `timestamp` or fallback to `createdAt`
         chatList = chatList.sort((a, b) => {
           const timeA = a.timestamp?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
           const timeB = b.timestamp?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
           return timeB - timeA;
         });
-  
+
         setConversations(chatList);
-  
+
         // Calculate the count of unread messages
         const unreadMessageCount = chatList.filter((chat) => chat.unread === true).length;
         setUnreadMessageCount(unreadMessageCount);
       });
     };
-  
+
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         fetchConversations(user); // Fetch conversations when the user is logged in
@@ -54,15 +52,13 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
         if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
       }
     });
-  
+
     return () => {
       if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
       authUnsubscribe(); // Cleanup authentication listener
     };
   }, [firestore, auth, setUnreadMessageCount]);
-  
 
-  // Fetch profile details of the other participant
   const getOtherParticipantInfo = async (participants) => {
     const otherParticipantId = participants.find(participant => participant !== auth.currentUser.uid);
     const otherParticipantRef = doc(firestore, 'users', otherParticipantId);
@@ -74,7 +70,6 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
     return null;
   };
 
-  // Navigate to the ChattingScreen with the chatId
   const handleChatPress = (chatId, participants) => {
     navigation.navigate('ChattingScreen', {
       chatId,
@@ -98,8 +93,8 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
               <ConversationPreview
                 participants={item.participants}
                 getOtherParticipantInfo={getOtherParticipantInfo}
-                lastMessage={item.lastMessage} // Assuming you have lastMessage stored
-                unread={item.unread} // Assuming 'unread' indicates unread messages
+                lastMessage={item.lastMessage}
+                unread={item.unread}
                 navigation={navigation}
               />
             </TouchableOpacity>
@@ -127,33 +122,11 @@ const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessag
     return null; // Return null or a loading indicator until the participant's info is fetched
   }
 
-  // Navigate to the appropriate profile (Instructor or Student) when the profile image is clicked
   const handleProfileImageClick = () => {
     if (otherParticipantInfo.role === 'instructor') {
-      navigation.navigate('InstructorProfile', {
-        firstName: otherParticipantInfo.firstName,
-        lastName: otherParticipantInfo.lastName,
-        phone: otherParticipantInfo.phone,
-        email: otherParticipantInfo.email,
-        whatsapp: otherParticipantInfo.whatsapp,
-        profileImage: otherParticipantInfo.profileImage,
-        price: otherParticipantInfo.price,
-        activePlan: otherParticipantInfo.activePlan,
-        userId: otherParticipantInfo.id,
-        studentsCount: otherParticipantInfo.studentsCount,
-        commentsCount: otherParticipantInfo.commentsCount,
-        rating: otherParticipantInfo.rating,
-        totalVotes: otherParticipantInfo.totalVotes,
-        carType: otherParticipantInfo.carType,
-        distance: otherParticipantInfo.distance,
-      });
+      navigation.navigate('InstructorProfile', { ...otherParticipantInfo });
     } else if (otherParticipantInfo.role === 'student') {
-      navigation.navigate('StudentProfile', {
-        firstName: otherParticipantInfo.firstName,
-        lastName: otherParticipantInfo.lastName,
-        profileImage: otherParticipantInfo.profileImage,
-        userId: otherParticipantInfo.id,
-      });
+      navigation.navigate('StudentProfile', { ...otherParticipantInfo });
     }
   };
 
@@ -169,12 +142,11 @@ const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessag
         <Text style={styles.chatName}>{`${otherParticipantInfo.firstName} ${otherParticipantInfo.lastName}`}</Text>
         <Text style={styles.lastMessage}>{lastMessage || 'No messages yet'}</Text>
       </View>
-      {unread && <View style={styles.unreadIndicator} />} 
+      {unread && <View style={styles.unreadIndicator} />}
     </View>
   );
 };
 
-// Styles for both MessagesScreen and ConversationPreview components
 const styles = StyleSheet.create({
   container: {
     flex: 1,

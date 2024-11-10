@@ -11,14 +11,13 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
-  Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, limit, startAfter, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const ChattingScreen = ({ route }) => {
-  const { chatId } = route.params;
+  const { chatId, participants } = route.params;
   const auth = getAuth();
   const currentUser = auth.currentUser;
   const firestore = getFirestore();
@@ -29,80 +28,63 @@ const ChattingScreen = ({ route }) => {
   const [lastVisible, setLastVisible] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const flatListRef = useRef(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     const messagesRef = collection(firestore, 'chats', chatId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(8));
-  
-    const unsubscribe = onSnapshot(
-      q,
-      async (snapshot) => {
-        if (!snapshot.empty) {
-          const newMessages = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-  
-          setMessages((prevMessages) => {
-            const prevMessageIds = prevMessages.map((msg) => msg.id);
-            const filteredNewMessages = newMessages.filter(
-              (msg) => !prevMessageIds.includes(msg.id)
-            );
-  
-            return [...filteredNewMessages.reverse(), ...prevMessages];
-          });
-  
-          setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-  
-          const chatRef = doc(firestore, 'users', currentUser.uid, 'chats', chatId);
-          await updateDoc(chatRef, { unread: false });
-        }
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Error fetching messages:', error);
-        setLoading(false);
-      }
+    const q = query(
+      messagesRef,
+      orderBy('timestamp', 'desc'),
+      limit(8)
     );
-  
-    return () => unsubscribe();
-  }, [firestore, chatId]);
-  
 
-  useEffect(() => {
-    const messagesRef = collection(firestore, 'chats', chatId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(8));
-  
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       if (!snapshot.empty) {
-        const newMessages = snapshot.docs.map(doc => ({
+        const newMessages = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
-  
+
         setMessages((prevMessages) => {
-          const newMessageIds = newMessages.map((msg) => msg.id);
-          const filteredPrevMessages = prevMessages.filter((msg) => !newMessageIds.includes(msg.id));
-          return [...filteredPrevMessages, ...newMessages.reverse()];
+          const prevMessageIds = prevMessages.map((msg) => msg.id);
+          const filteredNewMessages = newMessages.filter(
+            (msg) => !prevMessageIds.includes(msg.id)
+          );
+
+          return [...filteredNewMessages.reverse(), ...prevMessages];
         });
-  
+
         setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-  
+
         const chatRef = doc(firestore, 'users', currentUser.uid, 'chats', chatId);
         await updateDoc(chatRef, { unread: false });
+
+        // Scroll to the end only when a new message is received
+        flatListRef.current?.scrollToEnd({ animated: true });
       }
       setLoading(false);
     }, (error) => {
       console.error('Error fetching messages:', error);
       setLoading(false);
     });
-  
+
     return () => unsubscribe();
   }, [firestore, chatId]);
-  
 
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+  
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+  
   const handleSendMessage = async () => {
     if (newMessage.trim()) {
       const messageData = {
@@ -110,33 +92,35 @@ const ChattingScreen = ({ route }) => {
         senderId: currentUser.uid,
         timestamp: new Date(),
       };
-  
-      const otherParticipantId = route.params.participants.find(participant => participant !== currentUser.uid);
-  
+
+      const otherParticipantId = participants.find(participant => participant !== currentUser.uid);
+
       if (!otherParticipantId) {
         console.error('Error: Could not identify the other participant.');
         return;
       }
-  
+
       try {
         const messagesRef = collection(firestore, 'chats', chatId, 'messages');
         await addDoc(messagesRef, messageData);
-  
+
         const chatRefOther = doc(firestore, 'users', otherParticipantId, 'chats', chatId);
         const chatRefCurrent = doc(firestore, 'users', currentUser.uid, 'chats', chatId);
-  
+
         await updateDoc(chatRefOther, {
           unread: true,
           lastMessage: newMessage,
           timestamp: new Date(),
         });
-  
+
         await updateDoc(chatRefCurrent, {
           lastMessage: newMessage,
           timestamp: new Date(),
         });
-  
+
         setNewMessage('');
+        
+        // Scroll to the end after sending a new message
         flatListRef.current?.scrollToEnd({ animated: true });
       } catch (error) {
         console.error('Error sending message:', error);
@@ -208,14 +192,9 @@ const ChattingScreen = ({ route }) => {
           ListFooterComponent={loadingMore && <ActivityIndicator size="small" color="#4caf50" />}
           style={{
             flex: 1,
-            paddingBottom: keyboardHeight, // Adjust height dynamically based on keyboard height
+            paddingBottom: keyboardHeight, 
           }}
           contentContainerStyle={{ paddingBottom: 20 }}
-          onContentSizeChange={() => {
-            if (!loadingMore && !isInitialLoad) {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }
-          }}
         />
       )}
       <View style={styles.inputContainer}>
@@ -226,6 +205,9 @@ const ChattingScreen = ({ route }) => {
           value={newMessage}
           onChangeText={setNewMessage}
           multiline
+          onFocus={() => {
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+          }}
         />
         <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
           <Ionicons name="send" size={20} color="#fff" />
@@ -304,19 +286,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: 'right',
     marginTop: 5,
-  },
-  avatar: {
-    width: 35,
-    height: 35,
-    borderRadius: 20,
-    backgroundColor: '#2196f3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  avatarText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
 });
 

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, Alert, RefreshControl } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getViewedProfiles } from './storage_helpers';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -7,11 +7,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const RecentlyViewedProfiles = () => {
   const [viewedProfiles, setViewedProfiles] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
 
   const fetchViewedProfiles = async () => {
     const profiles = await getViewedProfiles();
-    setViewedProfiles(profiles);
+    setViewedProfiles(profiles || []); // Handle case when no profiles are found
   };
 
   useFocusEffect(
@@ -63,8 +64,15 @@ const RecentlyViewedProfiles = () => {
       price: profile.price,
       activePlan: profile.activePlan,
       userId: profile.id,
+      carType: profile.carType,
+      gender: profile.gender
     });
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchViewedProfiles().then(() => setRefreshing(false));
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -74,10 +82,17 @@ const RecentlyViewedProfiles = () => {
         <FlatList
           data={viewedProfiles}
           keyExtractor={(item) => item.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => (
             <View style={styles.profileContainer}>
               <TouchableOpacity onPress={() => handleProfileClick(item)} style={styles.profileDetails}>
                 <Text style={styles.profileName}>{item.firstName} {item.lastName}</Text>
+
+                {/* Gender Display */}
+                <View style={styles.iconText}>
+                  <Icon name="person-outline" size={18} color="gray" />
+                  <Text style={styles.iconLabel}>{item.gender || 'Not specified'}</Text>
+                </View>
 
                 <View style={styles.iconText}>
                   <Icon name="call-outline" size={18} color="gray" />
@@ -96,7 +111,7 @@ const RecentlyViewedProfiles = () => {
 
                 <View style={styles.iconText}>
                   <Icon name="car-outline" size={18} color="gray" />
-                  <Text style={styles.iconLabel}>{item.carType}</Text>
+                  <Text style={styles.iconLabel}>{item.carType || 'N/A'}</Text>
                 </View>
 
                 <View style={styles.ratingContainer}>
@@ -104,24 +119,6 @@ const RecentlyViewedProfiles = () => {
                     {renderStars(item.rating || 0)}
                   </View>
                   <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
-                </View>
-
-                <View style={styles.iconContainer}>
-                  <View style={styles.iconText}>
-                    <Icon name="people-outline" size={18} color="gray" />
-                    <Text style={styles.iconLabel}>{item.studentsCount || 0} students</Text>
-                  </View>
-
-                  <View style={styles.iconText}>
-                    <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
-                    <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
-                  </View>
-                  {item.distance !== null && (
-                  <View style={styles.iconText}>
-                    <Icon name="location-outline" size={18} color="gray" />
-                    <Text style={styles.iconLabel}>{item.distance.toFixed(1)} miles</Text>
-                  </View>
-                )}
                 </View>
               </TouchableOpacity>
 

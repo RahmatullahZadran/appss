@@ -112,16 +112,14 @@ const SearchScreen = () => {
       setLocation(userLocation);
       try {
         const usersRef = collection(firestore, 'users');
-        // Query to get only instructors with active subscription
         const q = query(
           usersRef,
-          where('role', '==', 'instructor'), // Filter by role to show only instructors
-          where('subscriptionEndDate', '>', new Date()), // Filter by active subscription
+          where('role', '==', 'instructor'),
+          where('subscriptionEndDate', '>', new Date())
         );
         const snapshot = await getDocs(q);
         const instructorsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   
-        // Fetch counts for students, comments, and ratings for each instructor
         const instructorsWithCounts = await Promise.all(
           instructorsData.map(async (instructor) => {
             const studentsCount = await getSubCollectionCount(instructor.id, 'students');
@@ -135,7 +133,6 @@ const SearchScreen = () => {
           })
         );
   
-        // Filter by distance and apply selected sorting
         let nearby = instructorsWithCounts.filter((instructor) => {
           if (instructor.latitude && instructor.longitude) {
             const distance = calculateDistance(
@@ -158,6 +155,7 @@ const SearchScreen = () => {
     }
     setLoading(false);
   };
+  
   
 
   
@@ -211,6 +209,7 @@ const SearchScreen = () => {
       totalVotes: instructor.totalVotes,
       carType: instructor.carType, // Add carType to the navigation
       distance: instructor.distance,
+      gender: instructor.gender
     });
   };
 
@@ -219,7 +218,6 @@ const SearchScreen = () => {
     await handleSearch();
     setRefreshing(false);
   };
-
   const renderListView = () => (
     <FlatList
       data={nearbyInstructors}
@@ -244,6 +242,12 @@ const SearchScreen = () => {
               <Text style={styles.instructorName}>
                 {item.firstName} {item.lastName}
               </Text>
+              
+              {/* Gender Display */}
+              <View style={styles.iconText}>
+                <Icon name="person-outline" size={18} color="gray" />
+                <Text style={styles.iconLabel}>{item.gender}</Text>
+              </View>
   
               <View style={styles.iconText}>
                 <Icon name="call-outline" size={18} color="gray" />
@@ -281,7 +285,6 @@ const SearchScreen = () => {
                   <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
                 </View>
   
-                {/* Add the distance */}
                 {item.distance !== null && (
                   <View style={styles.iconText}>
                     <Icon name="location-outline" size={18} color="gray" />
@@ -329,7 +332,7 @@ const SearchScreen = () => {
           style={styles.distancePicker}
           onValueChange={(value) => setSelectedDistance(value)}
         >
-          <Picker.Item  label="5 miles" value={5} />
+          <Picker.Item label="5 miles" value={5} />
           <Picker.Item label="10 miles" value={10} />
           <Picker.Item label="15 miles" value={15} />
           <Picker.Item label="20 miles" value={20} />

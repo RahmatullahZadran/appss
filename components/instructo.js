@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';  // Image Picker
 import { Timestamp } from 'firebase/firestore'; 
 import RNPickerSelect from 'react-native-picker-select';
 import SubscriptionModal from './SubscriptionModal';
+import * as Location from 'expo-location';
 
 const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postcode, activePlan, userId }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -20,6 +21,8 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
 
     const [rating, setRating] = useState(0); // Store the user's rating
     const [totalVotes, setTotalVotes] = useState(0); //
+    const [gender, setGender] = useState('');  // State for gender selection
+
 
     const [updatedPrice, setUpdatedPrice] = useState(price);  // Editable price state
     const [updatedWhatsapp, setUpdatedWhatsapp] = useState(whatsapp);
@@ -40,6 +43,8 @@ const InstructorProfile = ({ firstName, lastName, phone, email, whatsapp, postco
     const [isSubscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
     const [subscriptionEndDate, setSubscriptionEndDate] = useState(null);
     const [isSubscriptionActive, setIsSubscriptionActive] = useState(false);
+    const [postcodeError, setPostcodeError] = useState(null);  // Track postcode error message
+
 
     
     
@@ -77,6 +82,33 @@ const pickerSelectStyles = {
       paddingRight: 30, // to ensure the text is never behind the icon
     },
   };
+
+
+  const useCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Allow location access to fetch your postcode.');
+        return;
+      }
+  
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+  
+      const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+  
+      if (geocode.length > 0 && geocode[0].postalCode) {
+        setUpdatedPostcode(geocode[0].postalCode);  // Set the postcode if found
+        setPostcodeError(null);  // Clear any previous error
+      } else {
+        setPostcodeError('Unable to fetch postcode for this location.');
+      }
+    } catch (error) {
+      console.error('Error fetching location:', error);
+      setPostcodeError('Could not fetch current location.');
+    }
+  };
+  
 
   const renderStars = () => {
     const stars = [];
@@ -120,27 +152,32 @@ const pickerSelectStyles = {
     }
   };
   
-
-const fetchCoordinates = async (postcode) => {
+  const fetchCoordinates = async (postcode) => {
     try {
       const response = await fetch(`https://api.postcodes.io/postcodes/${postcode}`);
       const data = await response.json();
   
       if (data.status === 200) {
+        setPostcodeError(null);  // Clear error if valid
         return {
-          latitude: data.result.latitude,
-          longitude: data.result.longitude,
+          valid: true,
+          coordinates: {
+            latitude: data.result.latitude,
+            longitude: data.result.longitude,
+          },
         };
       } else {
-        Alert.alert('Error', 'Invalid postcode');
-        return null;
+        setPostcodeError('Invalid postcode');  // Set error message if invalid
+        return { valid: false };
       }
     } catch (error) {
       console.error('Error fetching coordinates:', error);
-      Alert.alert('Error', 'Could not fetch coordinates.');
-      return null;
+      setPostcodeError('Could not fetch coordinates.');  // Set error message on network failure
+      return { valid: false };
     }
   };
+  
+  
   
 
 const handleToggleCommentInput = () => {
@@ -311,13 +348,17 @@ const handleToggleCommentInput = () => {
         if (updatedPhone) updatedData.phone = updatedPhone;
         if (updatedEmail) updatedData.email = updatedEmail;
         if (updatedWhatsapp) updatedData.whatsapp = updatedWhatsapp;
+        if (gender) updatedData.gender = gender;  // Add gender to updated data
+  
         if (updatedPostcode) {
-          const coordinates = await fetchCoordinates(updatedPostcode);
-          if (coordinates) {
-            updatedData.postcode = updatedPostcode;
-            updatedData.latitude = coordinates.latitude;
-            updatedData.longitude = coordinates.longitude;
+          const { valid, coordinates } = await fetchCoordinates(updatedPostcode);
+          if (!valid) {
+            return;  // Stop saving if postcode is invalid
           }
+          // Only add postcode and coordinates if they are valid
+          updatedData.postcode = updatedPostcode;
+          updatedData.latitude = coordinates.latitude;
+          updatedData.longitude = coordinates.longitude;
         }
   
         updatedData.price = updatedPrice;  // Always save updated price
@@ -339,6 +380,8 @@ const handleToggleCommentInput = () => {
   };
   
   
+  
+  
   const fetchUserData = async () => {
     try {
       const userDocRef = doc(firestore, 'users', userId);
@@ -355,7 +398,7 @@ const handleToggleCommentInput = () => {
           setIsSubscriptionActive(new Date() < endDate);
         }
   
-        // Set other fields like price and rating here
+        // Set other fields like price, rating, and gender here
         if (userData.price) {
           setPrice(userData.price);
           setUpdatedPrice(userData.price);
@@ -364,11 +407,24 @@ const handleToggleCommentInput = () => {
         if (userData.rating) {
           setRating(userData.rating);  // Make sure rating is being set here
         }
+  
+        if (userData.carType) {
+          setCarType(userData.carType);  // Set the carType here
+        }
+  
+        if (userData.email) {
+          setUpdatedEmail(userData.email);
+        }
+  
+        if (userData.gender) {
+          setGender(userData.gender);  // Set gender here
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
   };
+  
   
 
   // Handle removing a student
@@ -537,9 +593,37 @@ const handleToggleCommentInput = () => {
 />
 
 
+
     </View>
         </View> 
       </View>
+      <View style={styles.genderSection}>
+  <Icon name="person-outline" size={24} color="#007bff" style={styles.genderIcon} />
+  <View style={styles.pickerContainer}>
+    {isEditing ? (
+      <RNPickerSelect
+        onValueChange={(value) => setGender(value)}
+        items={[
+          { label: 'Male', value: 'Male', icon: () => <Icon name="man-outline" size={20} color="#007bff" /> },
+          { label: 'Female', value: 'Female', icon: () => <Icon name="woman-outline" size={20} color="#ff69b4" /> },
+          { label: 'Other', value: 'Other', icon: () => <Icon name="person-outline" size={20} color="#777" /> },
+        ]}
+        value={gender}
+        style={pickerSelectStyles}
+        placeholder={{ label: 'Select Gender', value: null }}
+        useNativeAndroidPickerStyle={false}
+      />
+    ) : (
+      <View style={styles.genderDisplay}>
+        {gender === 'Male' }
+        {gender === 'Female' }
+        {gender === 'Other' }
+        <Text style={styles.genderText}>{gender}</Text>
+      </View>
+    )}
+  </View>
+</View>
+
 
       {/* Editable Profile Info */}
       <View style={styles.contactRow}>
@@ -576,15 +660,26 @@ const handleToggleCommentInput = () => {
         />
       </View>
       <View style={styles.contactRow}>
-        <Icon name="location-outline" size={20} color="#007bff" />
-        <TextInput
-          style={styles.input}
-          editable={isEditing}
-          value={updatedPostcode}
-          onChangeText={setUpdatedPostcode}
-          placeholder="Postcode"
-        />
-      </View>
+  <Icon name="location-outline" size={20} color="#007bff" />
+  <TextInput
+    style={[styles.input, styles.inputWithIcon]}  // Apply padding to avoid text overlap
+    editable={isEditing}
+    value={updatedPostcode}
+    onChangeText={setUpdatedPostcode}
+    placeholder="Postcode"
+  />
+  {isEditing && (
+    <TouchableOpacity onPress={useCurrentLocation} style={styles.absoluteIcon}>
+      <Icon name="location-outline" size={24} color="gray" />
+    </TouchableOpacity>
+  )}
+</View>
+
+
+
+
+{postcodeError && <Text style={styles.errorText}>{postcodeError}</Text>}
+
 
       {/* Price per Hour Section with £ symbol */}
       <View style={styles.contactRow}>
@@ -783,6 +878,8 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 5,
         right: 5,
+      },iconContainer: {
+        marginLeft: 10, // Add space between input and icon
       },
       replyInputContainer: {
         flexDirection: 'row',
@@ -879,10 +976,38 @@ const styles = StyleSheet.create({
       marginTop: 5, 
       fontSize: 16 
     },
+    inputWithIcon: {
+      paddingRight: 35, // Add padding to the right for icon space
+    },
+  
+    absoluteIcon: {
+      position: 'absolute',
+      right: 10,  // Position it slightly inside the right edge
+      top: '50%',
+      transform: [{ translateY: -12 }], // Center vertically in the input
+    },
     infoContainer: { 
       flex: 1, 
       justifyContent: 'center' 
     },
+    genderSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    genderIcon: {
+      marginRight: 10,
+    },
+    genderDisplay: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    genderText: {
+      fontSize: 16,
+      color: '#333',
+      marginLeft: 5,
+    },
+    
     profileName: { 
       fontSize: 24, 
       fontWeight: 'bold', 
@@ -947,6 +1072,9 @@ const styles = StyleSheet.create({
       marginBottom: 20, 
       textAlign: 'center' 
     },
+    locationIcon: {
+      marginLeft: 10, // Adjust spacing to your preference
+    },
     activeButton: {
         padding: 10,
         borderRadius: 20,
@@ -1004,6 +1132,13 @@ const styles = StyleSheet.create({
       justifyContent: 'space-between', 
       marginBottom: 20 
     },
+    errorText: {
+      color: 'red',
+      fontSize: 12,
+      marginTop: -15,  // Optional: Adjust spacing as needed
+      marginBottom: 10,
+    },
+    
     smallButton: { 
       backgroundColor: '#007bff', 
       paddingVertical: 10, 
@@ -1026,6 +1161,7 @@ const styles = StyleSheet.create({
       fontSize: 16, 
       color: '#555' 
     },
+    
   });
   
 
