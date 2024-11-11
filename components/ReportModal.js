@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, Alert, Image } from 'react-native';
 import { getFirestore, collection, addDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
-const ReportModal = ({ visible, onClose, userId }) => {
+const ReportModal = ({ 
+  visible, 
+  onClose, 
+  userId, 
+  reportedUserName, 
+  reportedUserPic, 
+  reportTitle = "Report Issue", 
+  placeholderText = "Describe the issue...", 
+  successMessage = "Your report has been submitted successfully.", 
+  errorMessage = "Something went wrong while submitting your report.", 
+  collectionName = 'reports' 
+}) => {
   const [reportText, setReportText] = useState('');
   const auth = getAuth();
   const currentUser = auth.currentUser;
@@ -17,21 +28,21 @@ const ReportModal = ({ visible, onClose, userId }) => {
 
     if (reportText.trim()) {
       try {
-        // Reference to the global 'reports' collection in Firestore
-        const reportsRef = collection(firestore, 'reports');
+        // Reference to the specified collection in Firestore
+        const reportsRef = collection(firestore, collectionName);
         await addDoc(reportsRef, {
-          reportText,                  // The content of the report
-          reportedBy: currentUser.uid, // ID of the user submitting the report
-          reportedUserId: userId,      // ID of the instructor being reported
-          timestamp: Timestamp.now(),  // Submission time of the report
+          reportText,
+          reportedBy: currentUser.uid,
+          reportedUserId: userId,
+          timestamp: Timestamp.now(),
         });
 
-        Alert.alert('Report Submitted', 'Your report has been submitted successfully.');
+        Alert.alert(reportTitle, successMessage);
         setReportText(''); // Clear the input
         onClose(); // Close the modal
       } catch (error) {
         console.error('Error submitting report:', error);
-        Alert.alert('Error', 'Something went wrong while submitting your report.');
+        Alert.alert('Error', errorMessage);
       }
     } else {
       Alert.alert('Empty Report', 'Please enter some details in your report.');
@@ -42,10 +53,16 @@ const ReportModal = ({ visible, onClose, userId }) => {
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Report Instructor</Text>
+          {/* Profile Section */}
+          <View style={styles.profileSection}>
+            <Image source={{ uri: reportedUserPic }} style={styles.profilePic} />
+            <Text style={styles.profileName}>Reporting {reportedUserName}</Text>
+          </View>
+
+          <Text style={styles.modalTitle}>{reportTitle}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Describe the issue..."
+            placeholder={placeholderText}
             value={reportText}
             onChangeText={setReportText}
             multiline
@@ -77,6 +94,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 10,
     alignItems: 'center',
+  },
+  profileSection: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  profilePic: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 8,
+  },
+  profileName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
   modalTitle: {
     fontSize: 20,

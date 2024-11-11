@@ -398,10 +398,12 @@ const handleAddReply = async (commentId) => {
       </View>
 
       <ReportModal
-        visible={reportModalVisible}
-        onClose={() => setReportModalVisible(false)}
-        userId={userId}
-      />
+  visible={reportModalVisible}
+  onClose={() => setReportModalVisible(false)}
+  userId={userId}
+  reportedUserName={`${firstName} ${lastName}`} // Pass full name
+  reportedUserPic={profileImage} // Pass profile image URL
+/>
 
       <View style={styles.section}>
       <View style={styles.sectionHeader}>

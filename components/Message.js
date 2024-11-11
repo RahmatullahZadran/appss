@@ -23,12 +23,10 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
           };
         });
 
-        // Filter out chats where the last message was sent by the current user to avoid irrelevant updates
         chatList = chatList.filter(
           (chat) => chat.lastMessage?.senderId !== user.uid
         );
 
-        // Sort chatList by the most recent message, using `timestamp` or fallback to `createdAt`
         chatList = chatList.sort((a, b) => {
           const timeA = a.timestamp?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
           const timeB = b.timestamp?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
@@ -37,7 +35,6 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
 
         setConversations(chatList);
 
-        // Calculate the count of unread messages
         const unreadMessageCount = chatList.filter((chat) => chat.unread === true).length;
         setUnreadMessageCount(unreadMessageCount);
       });
@@ -45,17 +42,17 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
 
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        fetchConversations(user); // Fetch conversations when the user is logged in
+        fetchConversations(user);
       } else {
         setConversations([]);
-        setUnreadMessageCount(0); // Reset the unread count when the user logs out
-        if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
+        setUnreadMessageCount(0);
+        if (unsubscribe) unsubscribe();
       }
     });
 
     return () => {
-      if (unsubscribe) unsubscribe(); // Cleanup Firestore listener
-      authUnsubscribe(); // Cleanup authentication listener
+      if (unsubscribe) unsubscribe();
+      authUnsubscribe();
     };
   }, [firestore, auth, setUnreadMessageCount]);
 
@@ -65,16 +62,22 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
     const otherParticipantSnap = await getDoc(otherParticipantRef);
 
     if (otherParticipantSnap.exists()) {
-      return { ...otherParticipantSnap.data(), id: otherParticipantId }; // Return the participant's full user info
+      return { ...otherParticipantSnap.data(), id: otherParticipantId };
     }
     return null;
   };
 
-  const handleChatPress = (chatId, participants) => {
-    navigation.navigate('ChattingScreen', {
-      chatId,
-      participants,
-    });
+  const handleChatPress = async (chatId, participants) => {
+    const otherParticipantInfo = await getOtherParticipantInfo(participants);
+    if (otherParticipantInfo) {
+      navigation.navigate('ChattingScreen', {
+        chatId,
+        participants,
+        instructorName: `${otherParticipantInfo.firstName} ${otherParticipantInfo.lastName}`, // Pass full name
+        profilePic: otherParticipantInfo.profileImage, // Pass profile image
+        role: otherParticipantInfo.role, // Pass the role (e.g., 'instructor' or 'student')
+      });
+    }
   };
 
   return (
@@ -95,7 +98,6 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
                 getOtherParticipantInfo={getOtherParticipantInfo}
                 lastMessage={item.lastMessage}
                 unread={item.unread}
-                navigation={navigation}
               />
             </TouchableOpacity>
           )}
@@ -106,7 +108,7 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
 };
 
 // Conversation Preview Component
-const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessage, unread, navigation }) => {
+const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessage, unread }) => {
   const [otherParticipantInfo, setOtherParticipantInfo] = useState(null);
 
   useEffect(() => {
@@ -119,25 +121,15 @@ const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessag
   }, [participants, getOtherParticipantInfo]);
 
   if (!otherParticipantInfo) {
-    return null; // Return null or a loading indicator until the participant's info is fetched
+    return null;
   }
-
-  const handleProfileImageClick = () => {
-    if (otherParticipantInfo.role === 'instructor') {
-      navigation.navigate('InstructorProfile', { ...otherParticipantInfo });
-    } else if (otherParticipantInfo.role === 'student') {
-      navigation.navigate('StudentProfile', { ...otherParticipantInfo });
-    }
-  };
 
   return (
     <View style={styles.conversationContainer}>
-      <TouchableOpacity onPress={handleProfileImageClick}>
-        <Image
-          source={{ uri: otherParticipantInfo.profileImage || 'https://via.placeholder.com/50' }}
-          style={styles.profileImage}
-        />
-      </TouchableOpacity>
+      <Image
+        source={{ uri: otherParticipantInfo.profileImage || 'https://via.placeholder.com/50' }}
+        style={styles.profileImage}
+      />
       <View style={styles.chatInfo}>
         <Text style={styles.chatName}>{`${otherParticipantInfo.firstName} ${otherParticipantInfo.lastName}`}</Text>
         <Text style={styles.lastMessage}>{lastMessage || 'No messages yet'}</Text>

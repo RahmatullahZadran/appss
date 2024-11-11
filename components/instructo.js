@@ -201,14 +201,33 @@ const handleToggleCommentInput = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);  // Sign out from Firebase Auth
-      navigation.replace('Login');  // Navigate back to the login screen
-    } catch (error) {
-      console.error("Error signing out: ", error);
-    }
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout Confirmation',
+      'Are you sure you want to log out?',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => console.log('Logout canceled'),
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          onPress: async () => {
+            try {
+              await signOut(auth);  // Sign out from Firebase Auth
+              navigation.replace('Login');  // Navigate back to the login screen
+            } catch (error) {
+              console.error('Error signing out:', error);
+            }
+          },
+          style: 'destructive',
+        },
+      ],
+      { cancelable: true }
+    );
   };
+  
 
   // Fetch students data from Firestore
   const fetchStudents = async () => {
@@ -720,8 +739,9 @@ const handleToggleCommentInput = () => {
           <Text style={styles.buttonText}>{isEditing ? 'Save' : 'Edit Profile'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallButton} onPress={handleLogout}>
-          <Text style={styles.buttonText}>Logout</Text>
-        </TouchableOpacity>
+  <Text style={styles.buttonText}>Logout</Text>
+</TouchableOpacity>
+
       </View>
 
 

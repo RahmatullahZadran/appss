@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "602496785154",
+    "project_id": "yaallah-d6366",
+    "storage_bucket": "yaallah-d6366.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:602496785154:android:be8dcac7098298ce9c401b",
+        "android_client_info": {
+          "package_name": "com.rahmatullah95.MyApp2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "602496785154-uos0l639fij19euocls5phfl9rigkp5p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMs59kXi_QRT4_VvYyl8cQIsncfFFyTB4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "602496785154-uos0l639fij19euocls5phfl9rigkp5p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

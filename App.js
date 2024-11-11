@@ -7,6 +7,9 @@ import { View, Text } from 'react-native';
 import { getFirestore, collection, onSnapshot } from 'firebase/firestore';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { registerForPushNotificationsAsync } from './components/NotificationService';
+import * as Notifications from 'expo-notifications';
+import { Alert } from 'react-native';
 
 // Component imports
 import SearchScreen from './components/search';
@@ -61,6 +64,19 @@ function ProfileStack() {
 export default function App() {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [conversations, setConversations] = useState([]);
+  const [expoPushToken, setExpoPushToken] = useState(null);
+
+  useEffect(() => {
+    // Register for push notifications
+    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
+
+    // Listener for incoming notifications
+    const subscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received:', notification);
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
@@ -82,12 +98,16 @@ export default function App() {
 
           setConversations(chatList);
           const unreadCount = chatList.filter((chat) => chat.unread === true).length;
+          
+          // Trigger notification if there are new unread messages
+          if (unreadCount > unreadMessageCount) {
+            sendPushNotification(expoPushToken, 'New Messages', `You have ${unreadCount} unread messages.`);
+          }
+
           setUnreadMessageCount(unreadCount);
         });
 
-        return () => {
-          unsubscribe(); // Clean up Firestore listener
-        };
+        return () => unsubscribe();
       } else {
         setConversations([]);
         setUnreadMessageCount(0);
@@ -95,7 +115,25 @@ export default function App() {
     });
 
     return () => authUnsubscribe();
-  }, []);
+  }, [expoPushToken, unreadMessageCount]);
+
+  async function sendPushNotification(token, title, body) {
+    if (token) {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: token,
+          sound: 'default',
+          title: title,
+          body: body,
+        }),
+      });
+    }
+  }
 
   // Messages stack with prop drilling
   function MessagesStack() {

@@ -19,7 +19,9 @@
       "permissions": ["com.android.vending.BILLING"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#ffffff",
+        "useNextNotificationsApi": true,
+        "googleServicesFile": "./google-services.json"
       },
       "package": "com.rahmatullah95.MyApp2",
       "intentFilters": [
