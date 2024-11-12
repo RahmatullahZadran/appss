@@ -4,12 +4,13 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text } from 'react-native';
-import { getFirestore, collection, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { registerForPushNotificationsAsync } from './components/NotificationService';
 import * as Notifications from 'expo-notifications';
-import { Alert } from 'react-native';
+
+
+
 
 // Component imports
 import SearchScreen from './components/search';
@@ -62,34 +63,26 @@ function ProfileStack() {
 
 // Main App component with conversation listener
 export default function App() {
+  const [expoPushToken, setExpoPushToken] = useState('');
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [conversations, setConversations] = useState([]);
-  const [expoPushToken, setExpoPushToken] = useState(null);
 
   useEffect(() => {
-    // Register for push notifications
-    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
-
-    // Listener for incoming notifications
-    const subscription = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received:', notification);
-    });
-
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    const authUnsubscribe = onAuthStateChanged(auth, (user) => {
+    const authUnsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
+        // If the user is logged in, get and save the push token
+        await getPushToken(user);
+
         const userChatsRef = collection(firestore, 'users', user.uid, 'chats');
-        
+
+        // Listen to the user's conversations collection to update unread message count
         const unsubscribe = onSnapshot(userChatsRef, (snapshot) => {
           let chatList = snapshot.docs.map((doc) => {
             const data = doc.data();
             return { id: doc.id, ...data };
           });
 
-          // Sort chats by timestamp or createdAt
+          // Sort conversations by timestamp
           chatList = chatList.sort((a, b) => {
             const timeA = a.timestamp?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
             const timeB = b.timestamp?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
@@ -97,43 +90,73 @@ export default function App() {
           });
 
           setConversations(chatList);
-          const unreadCount = chatList.filter((chat) => chat.unread === true).length;
-          
-          // Trigger notification if there are new unread messages
-          if (unreadCount > unreadMessageCount) {
-            sendPushNotification(expoPushToken, 'New Messages', `You have ${unreadCount} unread messages.`);
-          }
 
+          // Count unread messages
+          const unreadCount = chatList.filter((chat) => chat.unread === true).length;
           setUnreadMessageCount(unreadCount);
         });
 
-        return () => unsubscribe();
+        // Cleanup the listener
+        return () => {
+          unsubscribe();
+        };
       } else {
+        // If the user is not logged in, reset conversations and unread message count
         setConversations([]);
         setUnreadMessageCount(0);
       }
     });
 
-    return () => authUnsubscribe();
-  }, [expoPushToken, unreadMessageCount]);
+    // Cleanup auth state listener
+    return () => {
+      authUnsubscribe();
+    };
+  }, []);
+  useEffect(() => {
+    // Listen for notifications when the app is in the background or closed
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('Notification tapped:', response);
+      // You can navigate or perform actions based on the notification data here
+    });
+  
+    return () => responseSubscription.remove();
+  }, []);
+  
 
-  async function sendPushNotification(token, title, body) {
-    if (token) {
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: token,
-          sound: 'default',
-          title: title,
-          body: body,
-        }),
-      });
+  useEffect(() => {
+    const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('Notification received in foreground:', notification);
+      // Custom handling, such as showing an alert or updating UI
+    });
+  
+    return () => foregroundSubscription.remove();
+  }, []);
+  
+  // Function to retrieve and save the Expo push token to Firestore
+  const getPushToken = async (user) => {
+    // Request permission for notifications
+    const { status } = await Notifications.requestPermissionsAsync();
+
+    if (status === 'granted') {
+      // Get the Expo push token
+      const token = await Notifications.getExpoPushTokenAsync();
+      setExpoPushToken(token.data); // Optionally save it in state
+
+      console.log('jackson: Push token ' + token.data);
+
+      try {
+        // Save the token to Firestore for the authenticated user
+        const userRef = doc(firestore, 'users', user.uid);
+        await updateDoc(userRef, { expoPushToken: token.data });
+
+        console.log('jackson: Push token saved to Firestore ' + token.data);
+      } catch (error) {
+        console.error('Error saving push token to Firestore:', error);
+      }
+    } else {
+      console.log('Permission for notifications not granted');
     }
-  }
+  };
 
   // Messages stack with prop drilling
   function MessagesStack() {

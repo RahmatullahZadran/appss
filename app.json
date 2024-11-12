@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "notification": {
+      "icon": "./assets/notification-icon.png",  
+      "color": "#000000",  
+      "androidMode": "default",  
+      "androidCollapsedTitle": "Messages"  
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -19,9 +25,7 @@
       "permissions": ["com.android.vending.BILLING"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#ffffff",
-        "useNextNotificationsApi": true,
-        "googleServicesFile": "./google-services.json"
+        "backgroundColor": "#ffffff"
       },
       "package": "com.rahmatullah95.MyApp2",
       "intentFilters": [
