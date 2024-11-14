@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "notification": {
-      "icon": "./assets/notification-icon.png",  
+      "icon": "./assets/icon.png",  
       "color": "#000000",  
       "androidMode": "default",  
       "androidCollapsedTitle": "Messages"  
@@ -22,7 +22,18 @@
       "bundleIdentifier": "com.rahmatullah95.MyApp2"
     },
     "android": {
-      "permissions": ["com.android.vending.BILLING"],
+      "permissions": [
+        "INTERNET",
+        "POST_NOTIFICATIONS",
+        "NOTIFICATIONS",
+    "READ_EXTERNAL_STORAGE",
+    "WRITE_EXTERNAL_STORAGE",
+    "ACCESS_NETWORK_STATE",
+    "POST_NOTIFICATIONS",
+    "com.android.vending.BILLING"
+  ],
+  "googleServicesFile": "./assets/google-services.json",
+      "useNextNotificationsApi": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
@@ -56,6 +67,6 @@
       "firebaseMessagingSenderId": "@env:FIREBASE_MESSAGING_SENDER_ID",
       "firebaseAppId": "@env:FIREBASE_APP_ID"
     },
-    "plugins": ["react-native-iap"]
+    "plugins": ["react-native-iap", "expo-notifications"]
   }
 }
