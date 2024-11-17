@@ -216,7 +216,6 @@ const handleToggleCommentInput = () => {
           onPress: async () => {
             try {
               await signOut(auth);  // Sign out from Firebase Auth
-              navigation.replace('Login');  // Navigate back to the login screen
             } catch (error) {
               console.error('Error signing out:', error);
             }

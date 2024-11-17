@@ -204,6 +204,7 @@ const [alertIcon, setAlertIcon] = useState('alert-circle');
         chatId,
         instructorName: `${firstName} ${lastName}`,
         participants: [currentUser.uid, userId], // Pass participants for ChattingScreen
+        profilePic: profileImage,
       });
     } catch (error) {
       console.error('Error starting conversation:', error);

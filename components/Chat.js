@@ -1,4 +1,5 @@
   import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+  import { SafeAreaView } from 'react-native-safe-area-context';
   import { 
     View, 
     Text, 
@@ -32,6 +33,23 @@
     const [loadingMore, setLoadingMore] = useState(false);
     const flatListRef = useRef(null);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
+    useEffect(() => {
+      const parentNavigator = navigation.getParent(); // Get the parent navigator
+      if (parentNavigator) {
+        parentNavigator.setOptions({
+          tabBarStyle: { display: 'none' }, // Hide the bottom tab bar
+        });
+      }
+    
+      return () => {
+        if (parentNavigator) {
+          parentNavigator.setOptions({
+            tabBarStyle: {}, // Restore the bottom tab bar
+          });
+        }
+      };
+    }, [navigation]);
+    
 
     useEffect(() => {
       navigation.setOptions({
@@ -46,7 +64,7 @@
 
     useEffect(() => {
       const messagesRef = collection(firestore, 'chats', chatId, 'messages');
-      const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(8));
+      const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(9));
     
       const unsubscribe = onSnapshot(
         q,
@@ -196,50 +214,53 @@
       );
     }, [currentUser.uid]);
 
-    return (
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {loading ? (
-          <ActivityIndicator size="large" color="#4caf50" style={styles.loadingIndicator} />
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            onScroll={({ nativeEvent }) => {
-              if (nativeEvent.contentOffset.y === 0) {
-                fetchMoreMessages();
-              }
-            }}
-            ListFooterComponent={loadingMore && <ActivityIndicator size="small" color="#4caf50" />}
-            style={{
-              flex: 1,
-              paddingBottom: keyboardHeight, 
-            }}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          />
-        )}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message"
-            placeholderTextColor="#a9a9a9"
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            onFocus={() => {
-              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-            }}
-          />
-          <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
-            <Ionicons name="send" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    );
+  
+      return (
+        <SafeAreaView style={styles.container}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            {loading ? (
+              <ActivityIndicator size="large" color="#4caf50" style={styles.loadingIndicator} />
+            ) : (
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                keyExtractor={(item) => item.id}
+                renderItem={renderMessage}
+                onScroll={({ nativeEvent }) => {
+                  if (nativeEvent.contentOffset.y === 0) {
+                    fetchMoreMessages();
+                  }
+                }}
+                ListFooterComponent={loadingMore && <ActivityIndicator size="small" color="#4caf50" />}
+                style={{
+                  flex: 1,
+                  paddingBottom: keyboardHeight,
+                }}
+                contentContainerStyle={{ paddingBottom: 20 }}
+              />
+            )}
+            <View style={[styles.inputContainer, { marginBottom: keyboardHeight }]}>
+              <TextInput
+                style={styles.input}
+                placeholder="Type a message"
+                placeholderTextColor="#a9a9a9"
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+                onFocus={() => {
+                  setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+                }}
+              />
+              <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
+                <Ionicons name="send" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      );
   };
 
   const styles = StyleSheet.create({
@@ -275,6 +296,7 @@
       borderTopWidth: 1,
       borderColor: '#e0e0e0',
       backgroundColor: '#ffffff',
+      marginBottom: 0,
     },
     input: {
       flex: 1,

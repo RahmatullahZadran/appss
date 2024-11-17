@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react
 import { getFirestore, collection, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
+
 const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
   const [conversations, setConversations] = useState([]);
   const auth = getAuth();
@@ -98,6 +99,7 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
                 getOtherParticipantInfo={getOtherParticipantInfo}
                 lastMessage={item.lastMessage}
                 unread={item.unread}
+                navigation={navigation}
               />
             </TouchableOpacity>
           )}
@@ -108,7 +110,7 @@ const MessagesScreen = ({ navigation, setUnreadMessageCount }) => {
 };
 
 // Conversation Preview Component
-const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessage, unread }) => {
+const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessage, unread, navigation }) => {
   const [otherParticipantInfo, setOtherParticipantInfo] = useState(null);
 
   useEffect(() => {
@@ -124,12 +126,42 @@ const ConversationPreview = ({ participants, getOtherParticipantInfo, lastMessag
     return null;
   }
 
+  const handleProfilePress = () => {
+    if (otherParticipantInfo.role === 'instructor') {
+      // Navigate to InstructorProfileScreen for instructors
+      navigation.navigate('InstructorProfileScreen', {
+        firstName: otherParticipantInfo.firstName,
+        lastName: otherParticipantInfo.lastName,
+        phone: otherParticipantInfo.phone,
+        email: otherParticipantInfo.email,
+        whatsapp: otherParticipantInfo.whatsapp,
+        profileImage: otherParticipantInfo.profileImage,
+        price: otherParticipantInfo.price,
+        activePlan: otherParticipantInfo.activePlan,
+        userId: otherParticipantInfo.id,
+        carType: otherParticipantInfo.carType,
+        distance: otherParticipantInfo.distance,
+        gender: otherParticipantInfo.gender,
+      });
+    } else if (otherParticipantInfo.role === 'student') {
+      // Navigate to StudentProfile for students
+      navigation.navigate('StudentProfile', {
+        firstName: otherParticipantInfo.firstName,
+        lastName: otherParticipantInfo.lastName,
+        profileImage: otherParticipantInfo.profileImage,
+      });
+    }
+  };
+  
+
   return (
     <View style={styles.conversationContainer}>
-      <Image
-        source={{ uri: otherParticipantInfo.profileImage || 'https://via.placeholder.com/50' }}
-        style={styles.profileImage}
-      />
+      <TouchableOpacity onPress={handleProfilePress}>
+        <Image
+          source={{ uri: otherParticipantInfo.profileImage || 'https://via.placeholder.com/50' }}
+          style={styles.profileImage}
+        />
+      </TouchableOpacity>
       <View style={styles.chatInfo}>
         <Text style={styles.chatName}>{`${otherParticipantInfo.firstName} ${otherParticipantInfo.lastName}`}</Text>
         <Text style={styles.lastMessage}>{lastMessage || 'No messages yet'}</Text>

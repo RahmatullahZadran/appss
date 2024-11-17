@@ -205,25 +205,34 @@ const getPushToken = async (user) => {
   
     
 
-    // Messages stack with prop drilling
-    function MessagesStack() {
-      return (
-        <Stack.Navigator>
-          <Stack.Screen name="Messages" options={{ title: 'Messages' }}>
-            {(props) => (
-              <MessagesScreen
-                {...props}
-                conversations={conversations}
-                setUnreadMessageCount={setUnreadMessageCount}
-              />
-            )}
-          </Stack.Screen>
-          <Stack.Screen name="ChattingScreen" component={ChattingScreen} options={{ title: 'Chat' }} />
-          <Stack.Screen name="InstructorProfile" component={InstructorProfileScreen} options={{ title: 'Instructor Profile' }} />
-          <Stack.Screen name="StudentProfile" component={StudentProfile} options={{ title: 'Student Profile' }} />
-        </Stack.Navigator>
-      );
-    }
+function MessagesStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Messages" options={{ title: 'Messages' }}>
+        {(props) => (
+          <MessagesScreen
+            {...props}
+            conversations={conversations}
+            setUnreadMessageCount={setUnreadMessageCount}
+          />
+        )}
+      </Stack.Screen>
+      <Stack.Screen
+        name="InstructorProfileScreen"
+        component={InstructorProfileScreen}
+        options={{ title: 'Instructor Profile' }}
+      />
+      <Stack.Screen
+        name="StudentProfile"
+        component={StudentProfile}
+        options={{ title: 'Student Profile' }}
+      />
+      <Stack.Screen name="ChattingScreen" component={ChattingScreen} options={{ title: 'Chat' }} />
+    </Stack.Navigator>
+  );
+}
+
+
     function SearchScreenStack() {
       return (
         <Stack.Navigator>

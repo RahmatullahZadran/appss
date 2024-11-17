@@ -120,6 +120,26 @@ const RecentlyViewedProfiles = () => {
                   </View>
                   <Text style={styles.votesText}>({item.totalVotes || 0} votes)</Text>
                 </View>
+
+  
+              <View style={styles.iconContainer}>
+                <View style={styles.iconText}>
+                  <Icon name="people-outline" size={18} color="gray" />
+                  <Text style={styles.iconLabel}>{item.studentsCount || 0} students</Text>
+                </View>
+  
+                <View style={styles.iconText}>
+                  <Icon name="chatbubble-ellipses-outline" size={18} color="gray" />
+                  <Text style={styles.iconLabel}>{item.commentsCount || 0} comments</Text>
+                </View>
+  
+                {item.distance !== null && (
+                  <View style={styles.iconText}>
+                    <Icon name="location-outline" size={18} color="gray" />
+                    <Text style={styles.iconLabel}>{item.distance.toFixed(1)} miles</Text>
+                  </View>
+                )}
+              </View>
               </TouchableOpacity>
 
               <Image

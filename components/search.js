@@ -27,6 +27,13 @@ const SearchScreen = () => {
     requestLocationPermission();
   }, []);
 
+  useEffect(() => {
+    if (location) {
+      handleSearch();
+    }
+  }, [location]);
+  
+
   // Request location permission and get the current location
   const requestLocationPermission = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -44,12 +51,12 @@ const SearchScreen = () => {
         lat: userLocation.coords.latitude,
         lng: userLocation.coords.longitude,
       });
-      handleSearch();
       setErrorMessage('');
     } catch (error) {
       setErrorMessage('Unable to retrieve current location');
     }
   };
+  
 
   const geocodePostcode = async (postcode) => {
     try {
@@ -105,56 +112,56 @@ const SearchScreen = () => {
   };
   
   const handleSearch = async () => {
+    if (!location) return; // Wait for location to be set
     setLoading(true);
-    const userLocation = postcode ? await geocodePostcode(postcode) : location;
   
-    if (userLocation) {
-      setLocation(userLocation);
-      try {
-        const usersRef = collection(firestore, 'users');
-        const q = query(
-          usersRef,
-          where('role', '==', 'instructor'),
-          where('subscriptionEndDate', '>', new Date())
-        );
-        const snapshot = await getDocs(q);
-        const instructorsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    try {
+      const usersRef = collection(firestore, 'users');
+      const q = query(
+        usersRef,
+        where('role', '==', 'instructor'),
+        where('subscriptionEndDate', '>', new Date())
+      );
+      const snapshot = await getDocs(q);
+      const instructorsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   
-        const instructorsWithCounts = await Promise.all(
-          instructorsData.map(async (instructor) => {
-            const studentsCount = await getSubCollectionCount(instructor.id, 'students');
-            const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
-            const ratingData = await fetchInstructorRating(instructor.id);
-            const distance = instructor.latitude && instructor.longitude
-              ? calculateDistance(userLocation.lat, userLocation.lng, instructor.latitude, instructor.longitude)
+      const instructorsWithCounts = await Promise.all(
+        instructorsData.map(async (instructor) => {
+          const studentsCount = await getSubCollectionCount(instructor.id, 'students');
+          const commentsCount = await getSubCollectionCount(instructor.id, 'comments');
+          const ratingData = await fetchInstructorRating(instructor.id);
+          const distance =
+            instructor.latitude && instructor.longitude
+              ? calculateDistance(location.lat, location.lng, instructor.latitude, instructor.longitude)
               : null;
   
-            return { ...instructor, studentsCount, commentsCount, ...ratingData, distance };
-          })
-        );
+          return { ...instructor, studentsCount, commentsCount, ...ratingData, distance };
+        })
+      );
   
-        let nearby = instructorsWithCounts.filter((instructor) => {
-          if (instructor.latitude && instructor.longitude) {
-            const distance = calculateDistance(
-              userLocation.lat,
-              userLocation.lng,
-              instructor.latitude,
-              instructor.longitude
-            );
-            return distance <= selectedDistance;
-          }
-          return false;
-        });
+      let nearby = instructorsWithCounts.filter((instructor) => {
+        if (instructor.latitude && instructor.longitude) {
+          const distance = calculateDistance(
+            location.lat,
+            location.lng,
+            instructor.latitude,
+            instructor.longitude
+          );
+          return distance <= selectedDistance;
+        }
+        return false;
+      });
   
-        sortInstructors(nearby, selectedFilter);
-        setNearbyInstructors(nearby);
-        setHasSearched(true);
-      } catch (error) {
-        setErrorMessage('Failed to fetch instructors.');
-      }
+      sortInstructors(nearby, selectedFilter);
+      setNearbyInstructors(nearby);
+      setHasSearched(true);
+    } catch (error) {
+      setErrorMessage('Failed to fetch instructors.');
     }
+  
     setLoading(false);
   };
+  
   
   
 
