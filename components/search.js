@@ -46,7 +46,7 @@ const SearchScreen = () => {
   const useCurrentLocation = async () => {
     try {
       let userLocation = await Location.getCurrentPositionAsync({});
-      setPostcode(''); // Clear the postcode if using current location
+      setPostcode(''); // Clear the postcode when using current location
       setLocation({
         lat: userLocation.coords.latitude,
         lng: userLocation.coords.longitude,
@@ -56,6 +56,7 @@ const SearchScreen = () => {
       setErrorMessage('Unable to retrieve current location');
     }
   };
+  
   
 
   const geocodePostcode = async (postcode) => {
@@ -112,10 +113,26 @@ const SearchScreen = () => {
   };
   
   const handleSearch = async () => {
-    if (!location) return; // Wait for location to be set
     setLoading(true);
-  
     try {
+      let searchLocation = location;
+  
+      // If the user provided a postcode, geocode it
+      if (postcode) {
+        const geocodedLocation = await geocodePostcode(postcode);
+        if (!geocodedLocation) {
+          setLoading(false);
+          return;
+        }
+        searchLocation = geocodedLocation; // Update the search location to the geocoded location
+      }
+  
+      if (!searchLocation) {
+        Alert.alert('Error', 'Please provide a valid postcode or allow location access.');
+        setLoading(false);
+        return;
+      }
+  
       const usersRef = collection(firestore, 'users');
       const q = query(
         usersRef,
@@ -123,8 +140,8 @@ const SearchScreen = () => {
         where('subscriptionEndDate', '>', new Date())
       );
       const snapshot = await getDocs(q);
-      const instructorsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   
+      const instructorsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       const instructorsWithCounts = await Promise.all(
         instructorsData.map(async (instructor) => {
           const studentsCount = await getSubCollectionCount(instructor.id, 'students');
@@ -132,7 +149,7 @@ const SearchScreen = () => {
           const ratingData = await fetchInstructorRating(instructor.id);
           const distance =
             instructor.latitude && instructor.longitude
-              ? calculateDistance(location.lat, location.lng, instructor.latitude, instructor.longitude)
+              ? calculateDistance(searchLocation.lat, searchLocation.lng, instructor.latitude, instructor.longitude)
               : null;
   
           return { ...instructor, studentsCount, commentsCount, ...ratingData, distance };
@@ -142,8 +159,8 @@ const SearchScreen = () => {
       let nearby = instructorsWithCounts.filter((instructor) => {
         if (instructor.latitude && instructor.longitude) {
           const distance = calculateDistance(
-            location.lat,
-            location.lng,
+            searchLocation.lat,
+            searchLocation.lng,
             instructor.latitude,
             instructor.longitude
           );
@@ -158,9 +175,9 @@ const SearchScreen = () => {
     } catch (error) {
       setErrorMessage('Failed to fetch instructors.');
     }
-  
     setLoading(false);
   };
+  
   
   
   
